@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react"
 import "../../css/LandingpageCSS/Navbar.css"
 import { useNavigate } from "react-router-dom";
+import logo from "./assets/logo.png";
 
 function Navbar() {
     const navigate = useNavigate();
@@ -39,7 +40,16 @@ function Navbar() {
             <header className={`navbar ${isScrolled ? "navbar--scrolled" : ""}`}>
                 <div className="navbar__left" onClick={() => handleNavigate("/")} role="button" tabIndex={0} aria-label="Go to home">
                     <div className="brand" onClick={() => handleNavigate("/")}>
-                        <span className="brand__logo" aria-hidden>AC</span>
+                        <img 
+                            src={logo} 
+                            alt="AlumniConnect Logo" 
+                            className="brand__logo"
+                            onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'inline-flex';
+                            }}
+                        />
+                        <span className="brand__logo-fallback" style={{display: 'none'}}>AC</span>
                         <h1 className="brand__name">AlumniConnect</h1>
                     </div>
                 </div>
