@@ -1,0 +1,88 @@
+.nostalgia-hero{
+    padding: 80px 50px 20px 50px;
+    text-align: center;
+}
+
+.nostalgia-hero h1{
+    margin: 0 auto 8px auto;
+    max-width: 900px;
+    font-size: 32px;
+    line-height: 1.2;
+    background: linear-gradient(90deg, #0f172a, #1f2937);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.nostalgia-hero p{
+    margin: 0 auto;
+    max-width: 720px;
+    color: #475569;
+}
+
+.nostalgia-gallery{
+    padding: 24px 50px 0 50px;
+}
+
+.gallery-grid{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.gallery-grid img{
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(2,6,23,0.08);
+}
+
+.nostalgia-stories{
+    padding: 40px 50px 60px 50px;
+}
+
+.nostalgia-stories h2{
+    margin: 0 0 16px 0;
+}
+
+.stories-grid{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.story-card{
+    padding: 16px;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.75);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 10px 30px rgba(2,6,23,0.06);
+}
+
+.story-card h3{
+    margin: 0 0 8px 0;
+}
+
+.story-card p{
+    margin: 0 0 10px 0;
+    color: #334155;
+}
+
+.story-meta{
+    font-size: 12px;
+    color: #64748b;
+}
+
+@media (max-width: 960px){
+    .gallery-grid{ grid-template-columns: repeat(2, 1fr); }
+    .stories-grid{ grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px){
+    .gallery-grid{ grid-template-columns: 1fr; }
+    .stories-grid{ grid-template-columns: 1fr; }
+}
+
+

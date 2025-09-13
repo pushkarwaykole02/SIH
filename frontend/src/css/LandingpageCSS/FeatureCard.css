@@ -1,0 +1,24 @@
+.key-feature-card{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--color-surface);
+    padding: 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.key-feature-card:hover{
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+.key-feature-card .icon{
+    font-size: 28px;
+}
+.key-feature-card h3{
+    margin: 6px 0 2px 0;
+}
+.key-feature-card span{
+    color: var(--color-text-muted);
+}

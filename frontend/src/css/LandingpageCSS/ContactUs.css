@@ -1,0 +1,103 @@
+.contact-section {
+    padding: 80px 50px;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.contact-container {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.contact-container h2 {
+    margin: 0 0 16px 0;
+    font-size: 32px;
+    background: linear-gradient(90deg, #0f172a, #1f2937);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-align: center;
+}
+
+.contact-container p {
+    margin: 0 auto 40px auto;
+    font-size: 18px;
+    color: #64748b;
+    text-align: center;
+}
+
+.contact-info {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 40px;
+    margin-top: 40px;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 30px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.contact-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(2, 6, 23, 0.12);
+}
+
+.contact-icon {
+    font-size: 32px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #fb8500, #f97316);
+    border-radius: 50%;
+    box-shadow: 0 8px 20px rgba(251, 133, 0, 0.3);
+}
+
+.contact-details h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    color: #0f172a;
+}
+
+.contact-link {
+    font-size: 16px;
+    color: #fb8500;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+.contact-link:hover {
+    color: #f97316;
+}
+
+@media (max-width: 768px) {
+    .contact-section {
+        padding: 60px 20px;
+    }
+    
+    .contact-info {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .contact-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 16px;
+    }
+    
+    .contact-container h2 {
+        font-size: 28px;
+    }
+}

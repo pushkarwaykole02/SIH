@@ -1,0 +1,32 @@
+.alumni-info{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255,255,255,0.8);
+    padding: 40px;
+    align-content: center;
+    margin: 20px auto;
+    max-width: 1100px;
+    border-radius: 24px;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    box-shadow: var(--shadow-sm);
+}
+
+
+.grid-container{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+.heading{
+    margin: 20px auto 0 auto;
+    padding: 10px;
+
+}
+
+@media (max-width: 960px){
+    .grid-container{ grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px){
+    .grid-container{ grid-template-columns: 1fr; }
+}

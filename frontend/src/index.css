@@ -1,0 +1,33 @@
+:root {
+    --color-bg: #f8fafc;
+    --color-surface: #ffffff;
+    --color-text: #0f172a;
+    --color-text-muted: #475569;
+    --color-primary: #fb8500;
+    --color-primary-600: #f97316;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --shadow-sm: 0 6px 18px rgba(2,6,23,0.06);
+    --shadow-md: 0 12px 30px rgba(2,6,23,0.10);
+}
+
+html{
+    scroll-behavior: smooth;
+}
+body{
+    font-family: "Poppins";
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+*{
+    margin: 0;
+    padding: 0;
+}
+
+h1, h2, h3 {
+    color: var(--color-text);
+}
+
+p { color: var(--color-text-muted); }
+
+a { color: inherit; }
