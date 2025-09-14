@@ -27,10 +27,20 @@ function RegisterCard(){
 
     const handleChange = (e) => {
         const { name, value, files } = e.target;
-        setFormValues((prev) => ({
-            ...prev,
-            [name]: files ? files[0] : value,
-        }));
+        
+        // Special handling for phone number - only allow digits and limit to 10
+        if (name === 'phone') {
+            const phoneValue = value.replace(/\D/g, '').slice(0, 10);
+            setFormValues((prev) => ({
+                ...prev,
+                [name]: phoneValue,
+            }));
+        } else {
+            setFormValues((prev) => ({
+                ...prev,
+                [name]: files ? files[0] : value,
+            }));
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -38,6 +48,19 @@ function RegisterCard(){
         setIsLoading(true);
         setError("");
         setSuccess(false);
+
+        // Client-side validation
+        if (formValues.phone && formValues.phone.length !== 10) {
+            setError("Phone number must be exactly 10 digits");
+            setIsLoading(false);
+            return;
+        }
+
+        if (formValues.password.length < 6) {
+            setError("Password must be at least 6 characters long");
+            setIsLoading(false);
+            return;
+        }
 
         try {
             // Create FormData for file upload
@@ -112,7 +135,26 @@ function RegisterCard(){
                             </div>
                             <div className="form-group">
                                 <label>Phone Number</label>
-                                <input name="phone" type="tel" placeholder="10-digit number" pattern="[0-9]{10}" inputMode="numeric" required value={formValues.phone} onChange={handleChange} />
+                                <input 
+                                    name="phone" 
+                                    type="tel" 
+                                    placeholder="1234567890" 
+                                    pattern="[0-9]{10}" 
+                                    inputMode="numeric" 
+                                    maxLength="10"
+                                    required 
+                                    value={formValues.phone} 
+                                    onChange={handleChange}
+                                    style={{
+                                        borderColor: formValues.phone && formValues.phone.length !== 10 ? '#ff4444' : '',
+                                        backgroundColor: formValues.phone && formValues.phone.length !== 10 ? '#fff5f5' : ''
+                                    }}
+                                />
+                                {formValues.phone && formValues.phone.length !== 10 && (
+                                    <small style={{ color: '#ff4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                                        Phone number must be exactly 10 digits
+                                    </small>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label>Degree</label>

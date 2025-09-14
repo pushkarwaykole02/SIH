@@ -120,9 +120,23 @@ function UpdateProfileModal({ isOpen, onClose, alumni, onProfileUpdated }) {
                 id="phone"
                 name="phone"
                 value={formData.phone}
-                onChange={handleChange}
-                placeholder="Enter your phone number"
+                onChange={(e) => {
+                  const phoneValue = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setFormData(prev => ({ ...prev, phone: phoneValue }));
+                }}
+                placeholder="1234567890"
+                pattern="[0-9]{10}"
+                maxLength="10"
+                style={{
+                  borderColor: formData.phone && formData.phone.length !== 10 ? '#ff4444' : '',
+                  backgroundColor: formData.phone && formData.phone.length !== 10 ? '#fff5f5' : ''
+                }}
               />
+              {formData.phone && formData.phone.length !== 10 && (
+                <small style={{ color: '#ff4444', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                  Phone number must be exactly 10 digits
+                </small>
+              )}
             </div>
           </div>
 

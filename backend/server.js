@@ -5,9 +5,10 @@ import bodyParser from 'body-parser';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import pkg from 'pg';
+import sql from 'mssql';
+import { DefaultAzureCredential } from '@azure/identity';
+import bcrypt from 'bcrypt';
 import nodemailer from 'nodemailer';
-const { Pool } = pkg;
 dotenv.config();
 
 const app = express();
@@ -52,61 +53,161 @@ const upload = multer({
 // Serve uploaded files statically
 app.use('/uploads', express.static(uploadsDir));
 
-// Use DATABASE_URL (Postgres connection string) from Supabase
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  console.warn("WARNING: DATABASE_URL not set. The server will start but DB operations will fail until you set it.");
+// Azure SQL Database configuration
+const azureConfig = {
+  server: process.env.AZURE_SQL_SERVER,
+  database: process.env.AZURE_SQL_DATABASE,
+  user: process.env.AZURE_AD_USERNAME,
+  password: process.env.AZURE_AD_PASSWORD,
+  options: {
+    encrypt: true,
+    trustServerCertificate: false,
+    enableArithAbort: true
+  }
+};
+
+// Debug: Log the configuration values
+console.log('Azure SQL Configuration:');
+console.log('Server:', azureConfig.server);
+console.log('Database:', azureConfig.database);
+console.log('User:', azureConfig.user);
+console.log('Password:', azureConfig.password ? '***SET***' : '***NOT SET***');
+
+if (!azureConfig.server || !azureConfig.database) {
+  console.warn("WARNING: Azure SQL configuration not set. The server will start but DB operations will fail until you set AZURE_SQL_SERVER and AZURE_SQL_DATABASE.");
 }
-const pool = new Pool({ connectionString });
+
+if (!azureConfig.user || !azureConfig.password) {
+  console.warn("WARNING: Azure AD credentials not set. You need to set AZURE_AD_USERNAME and AZURE_AD_PASSWORD for authentication.");
+}
+
+let pool;
+
+// Initialize Azure SQL connection
+async function initializeDatabase() {
+  if (!azureConfig.server || !azureConfig.database) {
+    console.warn("Skipping database initialization - Azure SQL config not set");
+    return;
+  }
+
+  try {
+    console.log("🔐 Getting Azure AD access token using DefaultAzureCredential...");
+    console.log("This will try: Azure CLI → Environment Variables → Managed Identity");
+    
+    // Get Azure AD access token using DefaultAzureCredential
+    // This will automatically try:
+    // 1. Azure CLI (if you're logged in with 'az login')
+    // 2. Environment variables (if set)
+    // 3. Managed Identity (if running on Azure)
+    const credential = new DefaultAzureCredential();
+    const tokenResponse = await credential.getToken('https://database.windows.net/');
+    const accessToken = tokenResponse.token;
+    
+    console.log("✅ Azure AD token obtained");
+    
+    // Configure connection with access token
+    const connectionConfig = {
+      server: azureConfig.server,
+      database: azureConfig.database,
+      authentication: {
+        type: 'azure-active-directory-access-token',
+        options: {
+          token: accessToken
+        }
+      },
+      options: {
+        encrypt: true,
+        trustServerCertificate: false,
+        enableArithAbort: true
+      }
+    };
+    
+    console.log("🔗 Connecting to Azure SQL Database...");
+    pool = await sql.connect(connectionConfig);
+    console.log("✅ Connected to Azure SQL Database");
+    await ensureTables();
+  } catch (err) {
+    console.error("❌ Failed to connect to Azure SQL Database:", err.message);
+    console.error("Make sure you have proper Azure AAD authentication configured");
+    console.error("Error details:", err);
+    
+    // Try fallback with SQL Server authentication
+    console.log("🔄 Trying SQL Server authentication as fallback...");
+    try {
+      const fallbackConfig = {
+        server: azureConfig.server,
+        database: azureConfig.database,
+        user: azureConfig.user,
+        password: azureConfig.password,
+        options: {
+          encrypt: true,
+          trustServerCertificate: false,
+          enableArithAbort: true
+        }
+      };
+      
+      pool = await sql.connect(fallbackConfig);
+      console.log("✅ Connected to Azure SQL Database (SQL Server auth)");
+      await ensureTables();
+    } catch (err2) {
+      console.error("❌ Fallback connection also failed:", err2.message);
+    }
+  }
+}
 
 // On startup create alumni table if not exists
 async function ensureTables() {
-  if (!connectionString) return;
+  if (!pool) return;
+  
   const createAlumni = `
-  CREATE TABLE IF NOT EXISTS alumni (
-    id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    phone TEXT,
-    degree TEXT,
-    graduation_year INTEGER,
-    department TEXT,
-    address TEXT,
-    city TEXT,
-    state TEXT,
-    country TEXT,
-    linkedin TEXT,
-    github TEXT,
-    status TEXT DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT now()
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='alumni' AND xtype='U')
+  CREATE TABLE alumni (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    name NVARCHAR(255) NOT NULL,
+    email NVARCHAR(255) UNIQUE NOT NULL,
+    password NVARCHAR(255) NOT NULL,
+    phone NVARCHAR(50),
+    degree NVARCHAR(255),
+    graduation_year INT,
+    department NVARCHAR(255),
+    address NVARCHAR(500),
+    city NVARCHAR(100),
+    state NVARCHAR(100),
+    country NVARCHAR(100),
+    linkedin NVARCHAR(500),
+    github NVARCHAR(500),
+    document_path NVARCHAR(500),
+    document_original_name NVARCHAR(255),
+    status NVARCHAR(50) DEFAULT 'pending',
+    created_at DATETIME2 DEFAULT GETDATE()
   );
   `;
 
   const createEvents = `
-  CREATE TABLE IF NOT EXISTS events (
-    id SERIAL PRIMARY KEY,
-    event_name TEXT NOT NULL,
-    event_description TEXT NOT NULL,
-    event_venue TEXT NOT NULL,
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='events' AND xtype='U')
+  CREATE TABLE events (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    event_name NVARCHAR(255) NOT NULL,
+    event_description NVARCHAR(MAX) NOT NULL,
+    event_venue NVARCHAR(500) NOT NULL,
     event_date DATE NOT NULL,
     event_time TIME,
-    created_by TEXT DEFAULT 'admin',
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now()
+    created_by NVARCHAR(255) DEFAULT 'admin',
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
   );
   `;
 
   try {
-    await pool.query(createAlumni);
-    await pool.query(createEvents);
-    console.log("Ensured tables exist.");
+    await pool.request().query(createAlumni);
+    await pool.request().query(createEvents);
+    console.log("✅ Ensured tables exist in Azure SQL Database");
   } catch (err) {
-    console.error("Error creating tables:", err.message);
+    console.error("❌ Error creating tables:", err.message);
   }
 }
 
-ensureTables();
+initializeDatabase();
 
 // ================= EMAIL CONFIGURATION ================= //
 const emailUser = process.env.EMAIL_USER || 'pushkarwaykole73@gmail.com';
@@ -179,24 +280,46 @@ app.post('/api/register', upload.single('document'), async (req, res) => {
     return res.status(400).json({ error: 'Document proof is required' });
   }
 
+  // Validate phone number (10 digits only)
+  if (phone && !/^\d{10}$/.test(phone)) {
+    return res.status(400).json({ error: 'Phone number must be exactly 10 digits' });
+  }
+
   try {
-    const q = `
+    // Hash the password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const request = pool.request();
+    request.input('name', sql.NVarChar, name);
+    request.input('email', sql.NVarChar, email);
+    request.input('password', sql.NVarChar, hashedPassword);
+    request.input('phone', sql.NVarChar, phone);
+    request.input('degree', sql.NVarChar, degree);
+    request.input('graduation_year', sql.Int, graduation_year || null);
+    request.input('department', sql.NVarChar, department);
+    request.input('address', sql.NVarChar, address);
+    request.input('city', sql.NVarChar, city);
+    request.input('state', sql.NVarChar, state);
+    request.input('country', sql.NVarChar, country);
+    request.input('linkedin', sql.NVarChar, linkedin);
+    request.input('github', sql.NVarChar, github);
+    request.input('document_path', sql.NVarChar, req.file.path);
+    request.input('document_original_name', sql.NVarChar, req.file.originalname);
+    request.input('status', sql.NVarChar, 'pending');
+
+    const result = await request.query(`
       INSERT INTO alumni (
         name, email, password, phone, degree, graduation_year, department,
         address, city, state, country, linkedin, github, document_path, document_original_name, status
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
-      )
-      RETURNING *;
-    `;
-    const vals = [
-      name, email, password, phone, degree,
-      graduation_year || null, department, address,
-      city, state, country, linkedin, github,
-      req.file.path, req.file.originalname, 'pending'
-    ];
-    const r = await pool.query(q, vals);
-    res.json({ success: true, alumni: r.rows[0] });
+        @name, @email, @password, @phone, @degree, @graduation_year, @department,
+        @address, @city, @state, @country, @linkedin, @github, @document_path, @document_original_name, @status
+      );
+      SELECT SCOPE_IDENTITY() as id, * FROM alumni WHERE id = SCOPE_IDENTITY();
+    `);
+    
+    res.json({ success: true, alumni: result.recordset[0] });
   } catch (err) {
     console.error(err);
     // If database insert fails, delete the uploaded file
@@ -212,9 +335,11 @@ app.get('/api/alumni', async (req, res) => {
   const email = req.query.email;
   if (!email) return res.status(400).json({ error: 'email required' });
   try {
-    const r = await pool.query('SELECT * FROM alumni WHERE email=$1', [email]);
-    if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
-    res.json(r.rows[0]);
+    const request = pool.request();
+    request.input('email', sql.NVarChar, email);
+    const result = await request.query('SELECT * FROM alumni WHERE email = @email');
+    if (result.recordset.length === 0) return res.status(404).json({ error: 'not found' });
+    res.json(result.recordset[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -229,32 +354,45 @@ app.put('/api/alumni/:id', async (req, res) => {
   } = req.body;
   
   try {
-    const result = await pool.query(
-      `UPDATE alumni SET 
-        name = COALESCE($1, name),
-        phone = COALESCE($2, phone),
-        degree = COALESCE($3, degree),
-        graduation_year = COALESCE($4, graduation_year),
-        department = COALESCE($5, department),
-        address = COALESCE($6, address),
-        city = COALESCE($7, city),
-        state = COALESCE($8, state),
-        country = COALESCE($9, country),
-        linkedin = COALESCE($10, linkedin),
-        github = COALESCE($11, github)
-      WHERE id = $12 
-      RETURNING *`,
-      [name, phone, degree, graduation_year, department, address, city, state, country, linkedin, github, id]
-    );
+    const request = pool.request();
+    request.input('id', sql.Int, id);
+    request.input('name', sql.NVarChar, name);
+    request.input('phone', sql.NVarChar, phone);
+    request.input('degree', sql.NVarChar, degree);
+    request.input('graduation_year', sql.Int, graduation_year);
+    request.input('department', sql.NVarChar, department);
+    request.input('address', sql.NVarChar, address);
+    request.input('city', sql.NVarChar, city);
+    request.input('state', sql.NVarChar, state);
+    request.input('country', sql.NVarChar, country);
+    request.input('linkedin', sql.NVarChar, linkedin);
+    request.input('github', sql.NVarChar, github);
+
+    const result = await request.query(`
+      UPDATE alumni SET 
+        name = ISNULL(@name, name),
+        phone = ISNULL(@phone, phone),
+        degree = ISNULL(@degree, degree),
+        graduation_year = ISNULL(@graduation_year, graduation_year),
+        department = ISNULL(@department, department),
+        address = ISNULL(@address, address),
+        city = ISNULL(@city, city),
+        state = ISNULL(@state, state),
+        country = ISNULL(@country, country),
+        linkedin = ISNULL(@linkedin, linkedin),
+        github = ISNULL(@github, github)
+      WHERE id = @id;
+      SELECT * FROM alumni WHERE id = @id;
+    `);
     
-    if (result.rows.length === 0) {
+    if (result.recordset.length === 0) {
       return res.status(404).json({ error: 'Alumni not found' });
     }
     
     res.json({ 
       success: true, 
       message: 'Profile updated successfully',
-      alumni: result.rows[0] 
+      alumni: result.recordset[0] 
     });
   } catch (err) {
     console.error('Error updating alumni profile:', err);
@@ -270,8 +408,9 @@ app.put('/api/alumni/:id', async (req, res) => {
 // Admin: list pending requests
 app.get('/api/admin/pending', async (req, res) => {
   try {
-    const r = await pool.query("SELECT * FROM alumni WHERE status='pending' ORDER BY created_at DESC");
-    res.json(r.rows);
+    const request = pool.request();
+    const result = await request.query("SELECT * FROM alumni WHERE status='pending' ORDER BY created_at DESC");
+    res.json(result.recordset);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -281,11 +420,13 @@ app.get('/api/admin/pending', async (req, res) => {
 app.get('/api/admin/document/:id', async (req, res) => {
   const id = req.params.id;
   try {
-    const r = await pool.query("SELECT document_path, document_original_name FROM alumni WHERE id=$1", [id]);
-    if (r.rowCount === 0) {
+    const request = pool.request();
+    request.input('id', sql.Int, id);
+    const result = await request.query("SELECT document_path, document_original_name FROM alumni WHERE id = @id");
+    if (result.recordset.length === 0) {
       return res.status(404).json({ error: 'Alumni not found' });
     }
-    const alumni = r.rows[0];
+    const alumni = result.recordset[0];
     if (!alumni.document_path) {
       return res.status(404).json({ error: 'No document found' });
     }
@@ -307,15 +448,19 @@ app.post('/api/admin/:id/approve', async (req, res) => {
   const id = req.params.id;
   try {
     // Get alumni data before updating
-    const alumniResult = await pool.query("SELECT * FROM alumni WHERE id=$1", [id]);
-    if (alumniResult.rowCount === 0) {
+    const request1 = pool.request();
+    request1.input('id', sql.Int, id);
+    const alumniResult = await request1.query("SELECT * FROM alumni WHERE id = @id");
+    if (alumniResult.recordset.length === 0) {
       return res.status(404).json({ error: 'Alumni not found' });
     }
     
-    const alumni = alumniResult.rows[0];
+    const alumni = alumniResult.recordset[0];
     
     // Update status
-    await pool.query("UPDATE alumni SET status='approved' WHERE id=$1", [id]);
+    const request2 = pool.request();
+    request2.input('id', sql.Int, id);
+    await request2.query("UPDATE alumni SET status='approved' WHERE id = @id");
     
     // Send approval email
     const approvalEmailHtml = `
@@ -373,15 +518,19 @@ app.post('/api/admin/:id/decline', async (req, res) => {
   const id = req.params.id;
   try {
     // Get alumni data before updating
-    const alumniResult = await pool.query("SELECT * FROM alumni WHERE id=$1", [id]);
-    if (alumniResult.rowCount === 0) {
+    const request1 = pool.request();
+    request1.input('id', sql.Int, id);
+    const alumniResult = await request1.query("SELECT * FROM alumni WHERE id = @id");
+    if (alumniResult.recordset.length === 0) {
       return res.status(404).json({ error: 'Alumni not found' });
     }
     
-    const alumni = alumniResult.rows[0];
+    const alumni = alumniResult.recordset[0];
     
     // Update status
-    await pool.query("UPDATE alumni SET status='declined' WHERE id=$1", [id]);
+    const request2 = pool.request();
+    request2.input('id', sql.Int, id);
+    await request2.query("UPDATE alumni SET status='declined' WHERE id = @id");
     
     // Send decline email
     const declineEmailHtml = `
@@ -441,12 +590,14 @@ app.post('/api/forgot-password', async (req, res) => {
   
   try {
     // Check if alumni exists
-    const alumniResult = await pool.query("SELECT * FROM alumni WHERE email=$1", [email]);
-    if (alumniResult.rowCount === 0) {
+    const request = pool.request();
+    request.input('email', sql.NVarChar, email);
+    const alumniResult = await request.query("SELECT * FROM alumni WHERE email = @email");
+    if (alumniResult.recordset.length === 0) {
       return res.status(404).json({ error: 'Email not found in our system' });
     }
     
-    const alumni = alumniResult.rows[0];
+    const alumni = alumniResult.recordset[0];
     
     // Generate a simple reset token (in production, use crypto.randomBytes)
     const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -516,10 +667,26 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    const q = 'SELECT * FROM alumni WHERE email=$1 AND password=$2';
-    const r = await pool.query(q, [email, password]);
-    if (r.rowCount === 0) return res.status(401).json({ error: 'Invalid credentials' });
-    res.json({ role: 'alumni', alumni: r.rows[0] });
+    const request = pool.request();
+    request.input('email', sql.NVarChar, email);
+    const result = await request.query('SELECT * FROM alumni WHERE email = @email');
+    
+    if (result.recordset.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const alumni = result.recordset[0];
+    
+    // Verify the password using bcrypt
+    const isPasswordValid = await bcrypt.compare(password, alumni.password);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Remove password from response for security
+    delete alumni.password;
+    res.json({ role: 'alumni', alumni });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -530,8 +697,9 @@ app.post('/api/login', async (req, res) => {
 // Function to get all approved alumni emails
 async function getApprovedAlumniEmails() {
   try {
-    const result = await pool.query("SELECT email, name FROM alumni WHERE status = 'approved'");
-    return result.rows;
+    const request = pool.request();
+    const result = await request.query("SELECT email, name FROM alumni WHERE status = 'approved'");
+    return result.recordset;
   } catch (err) {
     console.error('Error fetching approved alumni emails:', err);
     return [];
@@ -651,12 +819,20 @@ app.post('/api/events', async (req, res) => {
   const { event_name, event_description, event_venue, event_date, event_time } = req.body;
   
   try {
-    const result = await pool.query(
-      "INSERT INTO events (event_name, event_description, event_venue, event_date, event_time) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [event_name, event_description, event_venue, event_date, event_time]
-    );
+    const request = pool.request();
+    request.input('event_name', sql.NVarChar, event_name);
+    request.input('event_description', sql.NVarChar, event_description);
+    request.input('event_venue', sql.NVarChar, event_venue);
+    request.input('event_date', sql.Date, event_date);
+    request.input('event_time', sql.Time, event_time);
+
+    const result = await request.query(`
+      INSERT INTO events (event_name, event_description, event_venue, event_date, event_time) 
+      VALUES (@event_name, @event_description, @event_venue, @event_date, @event_time);
+      SELECT SCOPE_IDENTITY() as id, * FROM events WHERE id = SCOPE_IDENTITY();
+    `);
     
-    const newEvent = result.rows[0];
+    const newEvent = result.recordset[0];
     
     // Send email notifications to all approved alumni
     console.log('Sending event notification emails...');
@@ -677,8 +853,9 @@ app.post('/api/events', async (req, res) => {
 // Get all events
 app.get('/api/events', async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM events ORDER BY event_date ASC, event_time ASC");
-    res.json({ success: true, events: result.rows });
+    const request = pool.request();
+    const result = await request.query("SELECT * FROM events ORDER BY event_date ASC, event_time ASC");
+    res.json({ success: true, events: result.recordset });
   } catch (err) {
     console.error('Error fetching events:', err);
     res.status(500).json({ error: 'Failed to fetch events' });
@@ -690,8 +867,10 @@ app.get('/api/events/date/:date', async (req, res) => {
   const { date } = req.params;
   
   try {
-    const result = await pool.query("SELECT * FROM events WHERE event_date = $1 ORDER BY event_time ASC", [date]);
-    res.json({ success: true, events: result.rows });
+    const request = pool.request();
+    request.input('date', sql.Date, date);
+    const result = await request.query("SELECT * FROM events WHERE event_date = @date ORDER BY event_time ASC");
+    res.json({ success: true, events: result.recordset });
   } catch (err) {
     console.error('Error fetching events by date:', err);
     res.status(500).json({ error: 'Failed to fetch events by date' });
@@ -703,11 +882,13 @@ app.get('/api/events/:id', async (req, res) => {
   const { id } = req.params;
   
   try {
-    const result = await pool.query("SELECT * FROM events WHERE id = $1", [id]);
-    if (result.rows.length === 0) {
+    const request = pool.request();
+    request.input('id', sql.Int, id);
+    const result = await request.query("SELECT * FROM events WHERE id = @id");
+    if (result.recordset.length === 0) {
       return res.status(404).json({ error: 'Event not found' });
     }
-    res.json({ success: true, event: result.rows[0] });
+    res.json({ success: true, event: result.recordset[0] });
   } catch (err) {
     console.error('Error fetching event:', err);
     res.status(500).json({ error: 'Failed to fetch event' });
@@ -720,16 +901,31 @@ app.put('/api/events/:id', async (req, res) => {
   const { event_name, event_description, event_venue, event_date, event_time } = req.body;
   
   try {
-    const result = await pool.query(
-      "UPDATE events SET event_name = $1, event_description = $2, event_venue = $3, event_date = $4, event_time = $5, updated_at = CURRENT_TIMESTAMP WHERE id = $6 RETURNING *",
-      [event_name, event_description, event_venue, event_date, event_time, id]
-    );
+    const request = pool.request();
+    request.input('id', sql.Int, id);
+    request.input('event_name', sql.NVarChar, event_name);
+    request.input('event_description', sql.NVarChar, event_description);
+    request.input('event_venue', sql.NVarChar, event_venue);
+    request.input('event_date', sql.Date, event_date);
+    request.input('event_time', sql.Time, event_time);
+
+    const result = await request.query(`
+      UPDATE events SET 
+        event_name = @event_name, 
+        event_description = @event_description, 
+        event_venue = @event_venue, 
+        event_date = @event_date, 
+        event_time = @event_time, 
+        updated_at = GETDATE() 
+      WHERE id = @id;
+      SELECT * FROM events WHERE id = @id;
+    `);
     
-    if (result.rows.length === 0) {
+    if (result.recordset.length === 0) {
       return res.status(404).json({ error: 'Event not found' });
     }
     
-    res.json({ success: true, event: result.rows[0] });
+    res.json({ success: true, event: result.recordset[0] });
   } catch (err) {
     console.error('Error updating event:', err);
     res.status(500).json({ error: 'Failed to update event' });
@@ -739,12 +935,13 @@ app.put('/api/events/:id', async (req, res) => {
 // Get all alumni emails (for debugging purposes)
 app.get('/api/alumni/emails', async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, name, email, status FROM alumni ORDER BY status, name");
+    const request = pool.request();
+    const result = await request.query("SELECT id, name, email, status FROM alumni ORDER BY status, name");
     res.json({ 
       success: true, 
-      alumni: result.rows,
-      total: result.rows.length,
-      approved: result.rows.filter(alumni => alumni.status === 'approved').length
+      alumni: result.recordset,
+      total: result.recordset.length,
+      approved: result.recordset.filter(alumni => alumni.status === 'approved').length
     });
   } catch (err) {
     console.error('Error fetching alumni emails:', err);
@@ -787,8 +984,9 @@ app.get('/api/test-email', async (req, res) => {
 app.get('/api/quick-debug', async (req, res) => {
   try {
     // Check alumni
-    const allAlumni = await pool.query("SELECT id, name, email, status FROM alumni");
-    const approvedAlumni = allAlumni.rows.filter(a => a.status === 'approved');
+    const request = pool.request();
+    const allAlumni = await request.query("SELECT id, name, email, status FROM alumni");
+    const approvedAlumni = allAlumni.recordset.filter(a => a.status === 'approved');
     
     // Check email config
     const emailConfig = {
@@ -808,9 +1006,9 @@ app.get('/api/quick-debug', async (req, res) => {
     res.json({
       success: true,
       debug: {
-        totalAlumni: allAlumni.rows.length,
+        totalAlumni: allAlumni.recordset.length,
         approvedAlumni: approvedAlumni.length,
-        alumniList: allAlumni.rows.map(a => ({
+        alumniList: allAlumni.recordset.map(a => ({
           name: a.name,
           email: a.email,
           status: a.status
@@ -1003,9 +1201,14 @@ app.delete('/api/events/:id', async (req, res) => {
   const { id } = req.params;
   
   try {
-    const result = await pool.query("DELETE FROM events WHERE id = $1 RETURNING *", [id]);
+    const request = pool.request();
+    request.input('id', sql.Int, id);
+    const result = await request.query(`
+      DELETE FROM events WHERE id = @id;
+      SELECT @@ROWCOUNT as deletedRows;
+    `);
     
-    if (result.rows.length === 0) {
+    if (result.recordset[0].deletedRows === 0) {
       return res.status(404).json({ error: 'Event not found' });
     }
     
