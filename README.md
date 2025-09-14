@@ -1,277 +1,339 @@
-# Alumni Management System
+# 🎓 Alumni Management System
 
-A comprehensive web-based platform for managing alumni relationships, events, and networking opportunities. Built with React frontend and Node.js backend, featuring document verification, event management, and automated email notifications.
+A comprehensive web application for managing alumni connections, built with React frontend and Node.js backend, powered by Microsoft Azure SQL Database.
 
-## 🚀 Features
+## ✨ Features
 
-### For Alumni
-- **User Registration & Verification**: Secure registration with document upload for verification
-- **Profile Management**: Update personal information, academic details, and professional links
-- **Event Calendar**: View upcoming events with detailed information
-- **Dashboard**: Personalized dashboard with status tracking
-- **Email Notifications**: Automated notifications for account status and events
-- **Responsive Design**: Mobile-friendly interface
+### 🔐 Authentication & Security
+- **Secure Password Hashing** with bcrypt (12 salt rounds)
+- **Azure Active Directory Authentication** for database access
+- **JWT-based session management**
+- **Role-based access control** (Admin/Alumni)
 
-### For Administrators
-- **Admin Dashboard**: Comprehensive management interface
-- **Registration Approval**: Review and approve/decline alumni registrations
-- **Document Verification**: Download and review uploaded documents
-- **Event Management**: Create, update, and manage events
-- **Bulk Email Notifications**: Send event notifications to all approved alumni
-- **Analytics**: View alumni statistics and registration status
+### 👥 Alumni Management
+- **User Registration** with document verification
+- **Profile Management** with real-time updates
+- **Admin Approval System** for new registrations
+- **Email Notifications** for approval/decline status
 
-### General Features
-- **Landing Page**: Modern, responsive homepage with key features
-- **Authentication**: Secure login system with role-based access
-- **File Upload**: Support for PDF, DOC, DOCX, JPG, PNG files
-- **Email Integration**: Automated email system with HTML templates
-- **Database Integration**: PostgreSQL database with Supabase
-- **API Documentation**: RESTful API endpoints
+### 📱 Form Validation
+- **Strict Phone Number Validation** (exactly 10 digits)
+- **Real-time Input Validation** with visual feedback
+- **Email Format Validation**
+- **Password Strength Requirements**
 
-## 🛠️ Tech Stack
+### 📅 Event Management
+- **Event Creation & Management**
+- **Calendar Integration**
+- **Automated Email Notifications** to all approved alumni
+- **Event Details & RSVP System**
+
+### 📧 Email System
+- **Automated Welcome Emails**
+- **Event Notification System**
+- **Password Reset Functionality**
+- **Admin Approval Notifications**
+
+## 🏗️ Tech Stack
 
 ### Frontend
-- **React 19.1.1** - Modern UI library
-- **React Router DOM 7.8.2** - Client-side routing
-- **React Icons 5.5.0** - Icon library
-- **Vite 7.1.2** - Build tool and dev server
-- **CSS3** - Styling with custom components
+- **React 18** with Vite
+- **CSS3** with modern styling
+- **Responsive Design** for all devices
+- **Form Validation** with real-time feedback
 
 ### Backend
-- **Node.js** - Runtime environment
-- **Express.js 4.18.2** - Web framework
-- **PostgreSQL** - Database (via Supabase)
-- **Multer 2.0.2** - File upload handling
-- **Nodemailer 6.10.1** - Email service
-- **CORS 2.8.5** - Cross-origin resource sharing
+- **Node.js** with Express.js
+- **Microsoft Azure SQL Database**
+- **Azure Active Directory Authentication**
+- **bcrypt** for password hashing
+- **Multer** for file uploads
+- **Nodemailer** for email services
 
 ### Database
-- **PostgreSQL** - Primary database
-- **Supabase** - Database hosting and management
+- **Azure SQL Database** with AAD authentication
+- **Automatic Table Creation** on startup
+- **Optimized Queries** with parameterized statements
 
-## 📁 Project Structure
-
-```
-SIH-2025--Alumni-Management-System-main/
-├── frontend/
-│   ├── src/
-│   │   ├── components/          # Reusable UI components
-│   │   │   ├── DashboardNavbar.jsx
-│   │   │   ├── EventCalendar.jsx
-│   │   │   ├── EventForm.jsx
-│   │   │   ├── Landingpage/     # Landing page components
-│   │   │   ├── LoginPage/       # Authentication components
-│   │   │   └── RegisterPage/    # Registration components
-│   │   ├── pages/              # Main application pages
-│   │   │   ├── AdminDashboard.jsx
-│   │   │   ├── AlumniDashboard.jsx
-│   │   │   ├── LandingPage.jsx
-│   │   │   └── ...
-│   │   ├── services/
-│   │   │   └── api.js          # API service functions
-│   │   └── css/               # Stylesheets
-│   ├── package.json
-│   └── vite.config.js
-├── backend/
-│   ├── server.js              # Main server file
-│   ├── uploads/              # File upload directory
-│   ├── package.json
-│   └── node_modules/
-└── README.md
-```
-
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js (v16 or higher)
-- PostgreSQL database (or Supabase account)
-- Gmail account for email services
+- Azure CLI (for authentication)
+- Azure SQL Database instance
+- Gmail App Password (for email services)
 
 ### Installation
 
 1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd SIH-2025--Alumni-Management-System-main
-   ```
+```bash
+git clone <repository-url>
+cd SIH-2025--Alumni-Management-System-main
+```
 
 2. **Backend Setup**
-   ```bash
-   cd backend
-   npm install
-   ```
+```bash
+cd backend
+npm install
+```
 
 3. **Frontend Setup**
-   ```bash
-   cd ../frontend
-   npm install
-   ```
+```bash
+cd ../frontend
+npm install
+```
 
 4. **Environment Configuration**
-   
-   Create a `.env` file in the backend directory:
-   ```env
-   DATABASE_URL=your_postgresql_connection_string
-   EMAIL_USER=your_gmail_address
-   EMAIL_PASS=your_gmail_app_password
-   FRONTEND_URL=http://localhost:3000
-   PORT=5000
-   ```
+```bash
+# Backend .env file
+AZURE_SQL_SERVER=your-server.database.windows.net
+AZURE_SQL_DATABASE=your-database-name
+AZURE_AD_USERNAME=your-email@yourdomain.com
+AZURE_AD_PASSWORD=your-azure-password
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-gmail-app-password
+FRONTEND_URL=http://localhost:3000
+PORT=5000
+```
 
-   Create a `.env` file in the frontend directory:
-   ```env
-   VITE_API_URL=http://localhost:5000
-   ```
+5. **Azure Authentication**
+```bash
+# Login to Azure (for database access)
+az login
+```
 
-### Running the Application
+6. **Start the Application**
+```bash
+# Terminal 1 - Backend
+cd backend
+npm start
 
-1. **Start the Backend Server**
-   ```bash
-   cd backend
-   npm start
-   ```
-   Server will run on `http://localhost:5000`
+# Terminal 2 - Frontend
+cd frontend
+npm run dev
+```
 
-2. **Start the Frontend Development Server**
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-   Application will run on `http://localhost:3000`
+## 🔧 Configuration
+
+### Azure SQL Database Setup
+
+1. **Create Azure SQL Database** in Azure Portal
+2. **Set up Azure AD Admin** for your SQL server
+3. **Add your user to the database**:
+```sql
+CREATE USER [your-email@yourdomain.com] FROM EXTERNAL PROVIDER;
+ALTER ROLE db_datareader ADD MEMBER [your-email@yourdomain.com];
+ALTER ROLE db_datawriter ADD MEMBER [your-email@yourdomain.com];
+ALTER ROLE db_ddladmin ADD MEMBER [your-email@yourdomain.com];
+```
+
+### Email Configuration
+
+1. **Enable 2-Factor Authentication** on your Gmail account
+2. **Generate App Password**:
+   - Go to Google Account Settings
+   - Security → 2-Step Verification → App passwords
+   - Generate password for "Mail"
+3. **Use the app password** in your `.env` file
 
 ## 📊 Database Schema
 
 ### Alumni Table
 ```sql
 CREATE TABLE alumni (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL,
-  phone TEXT,
-  degree TEXT,
-  graduation_year INTEGER,
-  department TEXT,
-  address TEXT,
-  city TEXT,
-  state TEXT,
-  country TEXT,
-  linkedin TEXT,
-  github TEXT,
-  document_path TEXT,
-  document_original_name TEXT,
-  status TEXT DEFAULT 'pending',
-  created_at TIMESTAMP DEFAULT now()
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    name NVARCHAR(255) NOT NULL,
+    email NVARCHAR(255) UNIQUE NOT NULL,
+    password NVARCHAR(255) NOT NULL, -- Hashed with bcrypt
+    phone NVARCHAR(50),
+    degree NVARCHAR(255),
+    graduation_year INT,
+    department NVARCHAR(255),
+    address NVARCHAR(500),
+    city NVARCHAR(100),
+    state NVARCHAR(100),
+    country NVARCHAR(100),
+    linkedin NVARCHAR(500),
+    github NVARCHAR(500),
+    document_path NVARCHAR(500),
+    document_original_name NVARCHAR(255),
+    status NVARCHAR(50) DEFAULT 'pending',
+    created_at DATETIME2 DEFAULT GETDATE()
 );
 ```
 
 ### Events Table
 ```sql
 CREATE TABLE events (
-  id SERIAL PRIMARY KEY,
-  event_name TEXT NOT NULL,
-  event_description TEXT NOT NULL,
-  event_venue TEXT NOT NULL,
-  event_date DATE NOT NULL,
-  event_time TIME,
-  created_by TEXT DEFAULT 'admin',
-  created_at TIMESTAMP DEFAULT now(),
-  updated_at TIMESTAMP DEFAULT now()
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    event_name NVARCHAR(255) NOT NULL,
+    event_description NVARCHAR(MAX) NOT NULL,
+    event_venue NVARCHAR(500) NOT NULL,
+    event_date DATE NOT NULL,
+    event_time TIME,
+    created_by NVARCHAR(255) DEFAULT 'admin',
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
 );
 ```
 
-## 🔧 API Endpoints
+## 🔐 Security Features
+
+### Password Security
+- **bcrypt Hashing** with 12 salt rounds
+- **No plain text passwords** stored in database
+- **Secure password comparison** during login
+
+### Input Validation
+- **Phone Number**: Exactly 10 digits, numeric only
+- **Email**: RFC-compliant email validation
+- **Password**: Minimum 6 characters
+- **File Upload**: Restricted file types and sizes
 
 ### Authentication
-- `POST /api/register` - Register new alumni
+- **Azure AD Integration** for database access
+- **Session Management** with secure tokens
+- **Role-based Access Control**
+
+## 📱 API Endpoints
+
+### Authentication
+- `POST /api/register` - User registration
 - `POST /api/login` - User login
 - `POST /api/forgot-password` - Password reset
 
 ### Alumni Management
-- `GET /api/alumni?email={email}` - Get alumni by email
+- `GET /api/alumni` - Get alumni by email
 - `PUT /api/alumni/:id` - Update alumni profile
-
-### Admin Operations
 - `GET /api/admin/pending` - Get pending registrations
 - `POST /api/admin/:id/approve` - Approve alumni
 - `POST /api/admin/:id/decline` - Decline alumni
-- `GET /api/admin/document/:id` - Download verification document
 
 ### Event Management
-- `POST /api/events` - Create new event
 - `GET /api/events` - Get all events
-- `GET /api/events/:id` - Get specific event
+- `POST /api/events` - Create new event
 - `PUT /api/events/:id` - Update event
 - `DELETE /api/events/:id` - Delete event
 - `GET /api/events/date/:date` - Get events by date
 
-## 🎨 Key Components
+## 🎨 UI Components
 
-### Frontend Components
-- **LandingPage**: Homepage with hero section and features
-- **AdminDashboard**: Admin interface for managing registrations and events
-- **AlumniDashboard**: Alumni interface for profile and event management
-- **EventCalendar**: Interactive calendar for event display
-- **EventForm**: Form for creating and editing events
-- **UpdateProfileModal**: Modal for profile updates
+### Registration Form
+- **Real-time validation** with visual feedback
+- **File upload** for document verification
+- **Phone number formatting** (10 digits only)
+- **Password strength indicator**
 
-### Backend Features
-- **File Upload**: Secure file handling with validation
-- **Email Service**: Automated email notifications with HTML templates
-- **Database Integration**: PostgreSQL with connection pooling
-- **Error Handling**: Comprehensive error handling and logging
-- **Security**: CORS configuration and input validation
+### Admin Dashboard
+- **Pending approvals** management
+- **Event creation** and management
+- **User statistics** and analytics
+- **Email notification** system
 
-## 📧 Email Templates
-
-The system includes beautifully designed HTML email templates for:
-- Account approval notifications
-- Account decline notifications
-- Password reset emails
-- Event notification emails
-- Welcome messages
-
-## 🔐 Security Features
-
-- Password-based authentication
-- File upload validation
-- CORS protection
-- Input sanitization
-- Secure file storage
-- Email verification system
+### Alumni Dashboard
+- **Profile management** with real-time updates
+- **Event calendar** integration
+- **Document upload** functionality
+- **Contact information** management
 
 ## 🚀 Deployment
 
-### Backend Deployment
-1. Set up PostgreSQL database (Supabase recommended)
-2. Configure environment variables
-3. Deploy to your preferred hosting service (Heroku, Railway, etc.)
+### Azure Deployment
+1. **Deploy Backend** to Azure App Service
+2. **Deploy Frontend** to Azure Static Web Apps
+3. **Configure Environment Variables** in Azure
+4. **Set up Managed Identity** for database access
 
-### Frontend Deployment
-1. Build the production version: `npm run build`
-2. Deploy to Vercel, Netlify, or your preferred hosting service
-3. Update API URLs in environment variables
+### Environment Variables
+```env
+# Production Environment
+AZURE_SQL_SERVER=your-production-server.database.windows.net
+AZURE_SQL_DATABASE=alumni_production
+EMAIL_USER=production-email@yourdomain.com
+EMAIL_PASS=production-app-password
+FRONTEND_URL=https://your-frontend-url.com
+PORT=8080
+```
 
-## 🤝 Contributing
+## 🧪 Testing
+
+### Backend Testing
+```bash
+cd backend
+npm test
+```
+
+### Frontend Testing
+```bash
+cd frontend
+npm test
+```
+
+### Manual Testing
+1. **Registration Flow**: Test with valid/invalid data
+2. **Phone Validation**: Try different phone number formats
+3. **Password Security**: Verify hashing in database
+4. **Email Notifications**: Test approval/decline emails
+5. **Event Management**: Create and manage events
+
+## 📈 Performance Optimizations
+
+- **Database Indexing** on frequently queried columns
+- **Connection Pooling** for Azure SQL Database
+- **File Upload Optimization** with size limits
+- **Email Queue Management** for bulk notifications
+- **Caching Strategy** for frequently accessed data
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Failed**
+   - Verify Azure AD authentication
+   - Check firewall rules
+   - Ensure user has proper permissions
+
+2. **Email Not Sending**
+   - Verify Gmail app password
+   - Check email configuration
+   - Test email connection endpoint
+
+3. **Phone Validation Not Working**
+   - Clear browser cache
+   - Check JavaScript console for errors
+   - Verify form validation logic
+
+### Debug Endpoints
+- `GET /api/quick-debug` - System status
+- `GET /api/test-email` - Email configuration test
+- `POST /api/debug-event-notifications` - Event notification test
+
+## 📝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Test thoroughly
+4. Add tests for new functionality
 5. Submit a pull request
 
-## 📝 License
+## 📄 License
 
-This project is developed for SIH 2025 (Smart India Hackathon).
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 👥 Team
 
-Developed as part of Smart India Hackathon 2025.
+- **Backend Development**: Node.js, Express.js, Azure SQL
+- **Frontend Development**: React, CSS3, Responsive Design
+- **Database Design**: Azure SQL Database, AAD Authentication
+- **Security Implementation**: bcrypt, Input Validation, Role-based Access
 
-## 📞 Support
+## 🆘 Support
 
-For support and questions, contact: pushkarwaykole73@gmail.com
+For support and questions:
+- Create an issue in the repository
+- Check the troubleshooting section
+- Review the Azure setup documentation
 
 ---
 
-**Note**: This is a comprehensive alumni management system designed to facilitate connections between alumni and educational institutions. The system includes modern web technologies and follows best practices for security and user experience.
+**Built with ❤️ for Alumni Management and Networking**

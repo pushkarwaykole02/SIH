@@ -13,8 +13,8 @@ function HeroSection(){
                 <h1>Connecting Alumni and Institutions</h1>
                 <p>The ultimate platform to bridge the gap between alumni and their alma mater, fostering lifelong relationships and opportunities.</p>
                 <button className="join-btn" onClick={() => navigate("/register")}>
-                    <span class="btn-text-one">Join Now</span>
-                    <span class="btn-text-two">Get Started</span>
+                    <span className="btn-text-one">Join Now</span>
+                    <span className="btn-text-two">Get Started</span>
                 </button>
             </div>
         </div>
