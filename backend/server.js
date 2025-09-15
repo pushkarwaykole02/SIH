@@ -78,8 +78,11 @@ app.use('/uploads', express.static(uploadsDir));
 const azureConfig = {
   server: process.env.AZURE_SQL_SERVER,
   database: process.env.AZURE_SQL_DATABASE,
-  user: process.env.AZURE_AD_USERNAME,
-  password: process.env.AZURE_AD_PASSWORD,
+  // Prefer explicit SQL auth variables, fall back to AAD username/password
+  sqlUser: process.env.AZURE_SQL_USERNAME || null,
+  sqlPassword: process.env.AZURE_SQL_PASSWORD || null,
+  aadUser: process.env.AZURE_AD_USERNAME || null,
+  aadPassword: process.env.AZURE_AD_PASSWORD || null,
   options: {
     encrypt: true,
     trustServerCertificate: false,
@@ -91,15 +94,17 @@ const azureConfig = {
 console.log('Azure SQL Configuration:');
 console.log('Server:', azureConfig.server);
 console.log('Database:', azureConfig.database);
-console.log('User:', azureConfig.user);
-console.log('Password:', azureConfig.password ? '***SET***' : '***NOT SET***');
+console.log('User(SQL):', azureConfig.sqlUser || '—');
+console.log('User(AAD):', azureConfig.aadUser || '—');
+console.log('SQL Password:', azureConfig.sqlPassword ? '***SET***' : '***NOT SET***');
+console.log('AAD Password:', azureConfig.aadPassword ? '***SET***' : '***NOT SET***');
 
 if (!azureConfig.server || !azureConfig.database) {
   console.warn("WARNING: Azure SQL configuration not set. The server will start but DB operations will fail until you set AZURE_SQL_SERVER and AZURE_SQL_DATABASE.");
 }
 
-if (!azureConfig.user || !azureConfig.password) {
-  console.warn("WARNING: Azure AD credentials not set. You need to set AZURE_AD_USERNAME and AZURE_AD_PASSWORD for authentication.");
+if (!azureConfig.sqlUser && !azureConfig.aadUser) {
+  console.warn("WARNING: No database credentials found. Set AZURE_SQL_USERNAME/AZURE_SQL_PASSWORD (recommended) or AZURE_AD_USERNAME/AZURE_AD_PASSWORD.");
 }
 
 let pool;
@@ -112,63 +117,83 @@ async function initializeDatabase() {
   }
 
   try {
+    // Prefer SQL auth on servers like Render where AAD interactive methods are unavailable
+    if (azureConfig.sqlUser && azureConfig.sqlPassword) {
+      console.log("🔐 Trying SQL authentication first...");
+      const sqlAuthConfig = {
+        server: azureConfig.server,
+        database: azureConfig.database,
+        user: azureConfig.sqlUser,
+        password: azureConfig.sqlPassword,
+        options: azureConfig.options
+      };
+      pool = await sql.connect(sqlAuthConfig);
+      console.log("✅ Connected to Azure SQL Database (SQL auth)");
+      await ensureTables();
+      return;
+    }
+
     console.log("🔐 Getting Azure AD access token using DefaultAzureCredential...");
     console.log("This will try: Azure CLI → Environment Variables → Managed Identity");
-    
-    // Get Azure AD access token using DefaultAzureCredential
-    // This will automatically try:
-    // 1. Azure CLI (if you're logged in with 'az login')
-    // 2. Environment variables (if set)
-    // 3. Managed Identity (if running on Azure)
     const credential = new DefaultAzureCredential();
     const tokenResponse = await credential.getToken('https://database.windows.net/');
     const accessToken = tokenResponse.token;
-    
     console.log("✅ Azure AD token obtained");
-    
-    // Configure connection with access token
     const connectionConfig = {
       server: azureConfig.server,
       database: azureConfig.database,
       authentication: {
         type: 'azure-active-directory-access-token',
-        options: {
-          token: accessToken
-        }
+        options: { token: accessToken }
       },
-      options: {
-        encrypt: true,
-        trustServerCertificate: false,
-        enableArithAbort: true
-      }
+      options: azureConfig.options
     };
-    
-    console.log("🔗 Connecting to Azure SQL Database...");
+    console.log("🔗 Connecting to Azure SQL Database (AAD token)...");
     pool = await sql.connect(connectionConfig);
-    console.log("✅ Connected to Azure SQL Database");
+    console.log("✅ Connected to Azure SQL Database (AAD token)");
     await ensureTables();
   } catch (err) {
     console.error("❌ Failed to connect to Azure SQL Database:", err.message);
     console.error("Make sure you have proper Azure AAD authentication configured");
     console.error("Error details:", err);
     
-    // Try fallback with SQL Server authentication
-    console.log("🔄 Trying SQL Server authentication as fallback...");
+    // Try AAD username/password if provided
+    if (azureConfig.aadUser && azureConfig.aadPassword) {
+      try {
+        console.log("🔄 Trying AAD username/password auth...");
+        const aadPasswordConfig = {
+          server: azureConfig.server,
+          database: azureConfig.database,
+          authentication: {
+            type: 'azure-active-directory-password',
+            options: {
+              userName: azureConfig.aadUser,
+              password: azureConfig.aadPassword
+            }
+          },
+          options: azureConfig.options
+        };
+        pool = await sql.connect(aadPasswordConfig);
+        console.log("✅ Connected to Azure SQL Database (AAD username/password)");
+        await ensureTables();
+        return;
+      } catch (errAadPwd) {
+        console.error("❌ AAD username/password auth failed:", errAadPwd.message);
+      }
+    }
+
+    // Final fallback: SQL auth using aadUser if that was actually a SQL login
+    console.log("🔄 Trying SQL Server authentication as final fallback...");
     try {
       const fallbackConfig = {
         server: azureConfig.server,
         database: azureConfig.database,
-        user: azureConfig.user,
-        password: azureConfig.password,
-        options: {
-          encrypt: true,
-          trustServerCertificate: false,
-          enableArithAbort: true
-        }
+        user: azureConfig.sqlUser || azureConfig.aadUser,
+        password: azureConfig.sqlPassword || azureConfig.aadPassword,
+        options: azureConfig.options
       };
-      
       pool = await sql.connect(fallbackConfig);
-      console.log("✅ Connected to Azure SQL Database (SQL Server auth)");
+      console.log("✅ Connected to Azure SQL Database (SQL auth fallback)");
       await ensureTables();
     } catch (err2) {
       console.error("❌ Fallback connection also failed:", err2.message);
