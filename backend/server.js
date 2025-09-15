@@ -286,6 +286,15 @@ async function sendEmail(to, subject, htmlContent) {
 
 // ================= API ROUTES ================= //
 
+// Ensure database connection for API routes
+app.use((req, res, next) => {
+  if (!pool) {
+    console.error('Database pool is not initialized yet. Path:', req.path);
+    return res.status(503).json({ error: 'Database not connected. Please try again shortly.' });
+  }
+  next();
+});
+
 // Register alumni with file upload
 app.post('/api/register', upload.single('document'), async (req, res) => {
   const {
