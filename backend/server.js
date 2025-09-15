@@ -1234,5 +1234,10 @@ app.delete('/api/events/:id', async (req, res) => {
 
 // ============================================== //
 
+// Root route for basic status/health check
+app.get('/', (req, res) => {
+  res.send('Alumni Backend API is running. Try GET /api/quick-debug');
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('Server running on port', PORT));
