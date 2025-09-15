@@ -77,7 +77,7 @@ function LoginCard(){
 
                         <form onSubmit={handleSubmit}>
                             {error && (
-                                <div className="error-message" style={{ color: 'red', marginBottom: '16px', textAlign: 'center' }}>
+                                <div className="error-message" style={{ color: 'red', marginBottom: '16px', textAlign: 'center', width: '75%' }}>
                                     {error}
                                 </div>
                             )}
