@@ -46,15 +46,11 @@ jobs:
           cd backend
           zip -r ../release.zip . -x "**/node_modules/.cache/**"
 
-      - name: Azure Login (using publish profile)
-        uses: azure/login@v2
-        with:
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: release.zip
 
 
