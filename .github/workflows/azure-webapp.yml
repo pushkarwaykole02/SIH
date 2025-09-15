@@ -1,0 +1,56 @@
+name: Deploy Fullstack App to Azure Web App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18.x'
+  WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install and build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Bundle frontend into backend public/
+        run: |
+          rm -rf backend/public
+          mkdir -p backend/public
+          cp -R frontend/dist/* backend/public/
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          npm ci --only=production
+
+      - name: Zip backend for deployment
+        run: |
+          cd backend
+          zip -r ../release.zip . -x "**/node_modules/.cache/**"
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: release.zip
+
+

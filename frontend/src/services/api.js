@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = (typeof window !== 'undefined' && window.location && window.location.origin) || import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Debug logging for API URL
 console.log('API Base URL:', API_BASE_URL);

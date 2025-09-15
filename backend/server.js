@@ -4,6 +4,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import multer from 'multer';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import fs from 'fs';
 import sql from 'mssql';
 import { DefaultAzureCredential } from '@azure/identity';
@@ -19,13 +20,19 @@ const corsOptions = {
     const allowed = [
       'http://localhost:3000',
       'http://localhost:5173',
-      'https://sih-awv3.onrender.com',
+      process.env.FRONTEND_URL,
+    ].filter(Boolean);
+    const allowedRegexes = [
+      /https:\/\/.*\.vercel\.app$/,
+      /https:\/\/.*\.onrender\.com$/,
+      /https:\/\/.*\.azurestaticapps\.net$/,
+      /https:\/\/.*\.azurewebsites\.net$/,
     ];
-    if (!origin || allowed.includes(origin) || /https:\/\/.*\.vercel\.app$/.test(origin) || /https:\/\/.*\.onrender\.com$/.test(origin)) {
-      callback(null, true);
-    } else {
-      callback(null, false);
-    }
+    const isAllowed =
+      !origin ||
+      allowed.includes(origin) ||
+      allowedRegexes.some((re) => re.test(origin));
+    callback(null, isAllowed);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -1276,8 +1283,26 @@ app.delete('/api/events/:id', async (req, res) => {
 
 // ============================================== //
 
-// Root route for basic status/health check
+// ===== Static frontend hosting (serves built React app if present) ===== //
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const staticFrontendDir = path.join(__dirname, 'public');
+
+if (fs.existsSync(staticFrontendDir)) {
+  app.use(express.static(staticFrontendDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    const indexFile = path.join(staticFrontendDir, 'index.html');
+    if (fs.existsSync(indexFile)) {
+      return res.sendFile(indexFile);
+    }
+    return next();
+  });
+}
+
+// Root route for basic status/health check (fallback if no frontend build)
 app.get('/', (req, res) => {
+  if (fs.existsSync(staticFrontendDir)) return res.redirect('/');
   res.send('Alumni Backend API is running. Try GET /api/quick-debug');
 });
 
