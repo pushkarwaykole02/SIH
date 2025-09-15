@@ -13,15 +13,23 @@ dotenv.config();
 
 const app = express();
 
-// Configure CORS for production
+// Configure CORS
 const corsOptions = {
-  origin: [
-    'http://localhost:3000', // Local development
-    'http://localhost:5173', // Vite development server
-    'https://your-vercel-app.vercel.app', // Replace with your actual Vercel URL
-    'https://*.vercel.app' // Allow all Vercel preview deployments
-  ],
+  origin: (origin, callback) => {
+    const allowed = [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'https://sih-awv3.onrender.com',
+    ];
+    if (!origin || allowed.includes(origin) || /https:\/\/.*\.vercel\.app$/.test(origin) || /https:\/\/.*\.onrender\.com$/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   optionsSuccessStatus: 200
 };
 
