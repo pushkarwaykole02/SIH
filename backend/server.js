@@ -7,7 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import sql from 'mssql';
 import { DefaultAzureCredential } from '@azure/identity';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import nodemailer from 'nodemailer';
 dotenv.config();
 
