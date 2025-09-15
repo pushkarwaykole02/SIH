@@ -1,3 +1,5 @@
+<!-- Migrate uploads from uploads/ to Azure Blob Storage for persistence. -->
+
 # 🎓 Alumni Management System
 
 A comprehensive web application for managing alumni connections, built with React frontend and Node.js backend, powered by Microsoft Azure SQL Database.
