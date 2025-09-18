@@ -51,14 +51,13 @@
     width: 100%;
     box-shadow: var(--shadow-sm);
     border: 1px solid rgba(15, 23, 42, 0.06);
-    pa
 }
 
 .status-card.pending {
     border-left: 4px solid #f59e0b;
 }
 
-.status-card.declined {
+.status-card.declined, .status-card.rejected {
     border-left: 4px solid #ef4444;
 }
 
@@ -187,10 +186,12 @@
     display: flex;
     align-items: center;
     gap: 16px;
-    background: rgba(255, 255, 255, 0.8);
+    background: linear-gradient(135deg, #fde047, #fb923c);
     padding: 16px;
     border-radius: var(--radius-md);
-    border: 1px solid rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(251, 146, 60, 0.35);
+    box-shadow: 0 10px 20px rgba(251, 146, 60, 0.25);
+    color: #111827;
 }
 
 .profile-avatar {
@@ -209,14 +210,14 @@
 
 .profile-info h3 {
     margin: 0 0 4px 0;
-    color: var(--color-text);
+    color: #111827;
     font-size: 18px;
     font-weight: 700;
 }
 
 .profile-info p {
     margin: 0 0 8px 0;
-    color: var(--color-text-muted);
+    color: rgba(17, 24, 39, 0.8);
     font-size: 14px;
 }
 
@@ -458,6 +459,42 @@
     overflow: hidden;
 }
 
+/* Force alumni header mini-card to yellow gradient */
+.alumni-dashboard .profile-card {
+    background: linear-gradient(135deg, #ffffff, #ffffff) !important;
+    border-color: rgba(143, 139, 137, 0.35) !important;
+    box-shadow: 0 10px 20px rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+    gap: 20px;
+}
+
+/* Improve avatar contrast on yellow card */
+.alumni-dashboard .profile-card .profile-avatar {
+    background: #fb923c !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Tweak text contrast for name and subtitle */
+.alumni-dashboard .profile-card .profile-info h3 {
+    color: #000000 !important;
+}
+.alumni-dashboard .profile-card .profile-info h5 {
+    color: rgba(0, 0, 0, 0.9) !important;
+    margin-left: 20px;
+}
+
+/* Make verified badge readable on warm background */
+.alumni-dashboard .profile-card .status-badge.approved {
+    background: #d1fae5 !important;
+    color: #059669 !important;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    letter-spacing: 0.6px;
+    font-weight: 600;
+    margin-top: 5px;
+}
+
 .events-section::before {
     content: '';
     position: absolute;
@@ -487,6 +524,45 @@
     overflow: hidden;
 }
 
+/* Dashboard Tabs */
+.dashboard-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid #e2e8f0;
+    overflow-x: auto;
+    padding: 0 20px;
+}
+
+.tab-btn {
+    padding: 12px 20px;
+    border: none;
+    background: none;
+    color: #64748b;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.tab-btn:hover {
+    color: #3b82f6;
+    background: #f8fafc;
+    border-radius: 8px 8px 0 0;
+}
+
+.tab-btn.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+    background: #f8fafc;
+    border-radius: 8px 8px 0 0;
+}
+
 @media (max-width: 768px) {
     .events-section {
         margin-top: 30px;
@@ -495,5 +571,14 @@
     
     .events-title {
         font-size: 20px;
+    }
+    
+    .dashboard-tabs {
+        padding: 0 10px;
+    }
+    
+    .tab-btn {
+        padding: 10px 16px;
+        font-size: 13px;
     }
 }

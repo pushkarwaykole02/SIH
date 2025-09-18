@@ -11,12 +11,17 @@ function RegisterCard(){
         degree: "",
         graduationYear: "",
         department: "",
+        batch: "",
         address: "",
         city: "",
         state: "",
         country: "",
         linkedin: "",
         github: "",
+        website: "",
+        company: "",
+        designation: "",
+        yearsExperience: "",
         certificate: null,
     });
 
@@ -72,12 +77,17 @@ function RegisterCard(){
             formData.append('degree', formValues.degree);
             formData.append('graduation_year', formValues.graduationYear);
             formData.append('department', formValues.department);
+            formData.append('batch', formValues.batch);
             formData.append('address', formValues.address);
             formData.append('city', formValues.city);
             formData.append('state', formValues.state);
             formData.append('country', formValues.country);
             formData.append('linkedin', formValues.linkedin || '');
             formData.append('github', formValues.github || '');
+            formData.append('website', formValues.website || '');
+            formData.append('company', formValues.company || '');
+            formData.append('designation', formValues.designation || '');
+            formData.append('years_experience', formValues.yearsExperience || '');
             
             if (formValues.certificate) {
                 formData.append('document', formValues.certificate);
@@ -87,8 +97,9 @@ function RegisterCard(){
             setSuccess(true);
             setFormValues({
                 name: "", email: "", password: "", phone: "", degree: "",
-                graduationYear: "", department: "", address: "", city: "",
-                state: "", country: "", linkedin: "", github: "", certificate: null
+                graduationYear: "", department: "", batch: "", address: "", city: "",
+                state: "", country: "", linkedin: "", github: "", website: "",
+                company: "", designation: "", yearsExperience: "", certificate: null
             });
         } catch (err) {
             setError(err.message);
@@ -169,6 +180,10 @@ function RegisterCard(){
                                 <input name="department" type="text" placeholder="CSE / ECE / ME / CE" required value={formValues.department} onChange={handleChange} />
                             </div>
                             <div className="form-group">
+                                <label>Batch</label>
+                                <input name="batch" type="text" placeholder="2020-2024" value={formValues.batch} onChange={handleChange} />
+                            </div>
+                            <div className="form-group">
                                 <label>Address</label>
                                 <input name="address" type="text" placeholder="Street, Area" required value={formValues.address} onChange={handleChange} />
                             </div>
@@ -192,6 +207,22 @@ function RegisterCard(){
                                 <label>GitHub Link</label>
                                 <input name="github" type="url" placeholder="https://github.com/username" value={formValues.github} onChange={handleChange} />
                             </div>
+                            <div className="form-group">
+                                <label>Personal Website</label>
+                                <input name="website" type="url" placeholder="https://yourwebsite.com" value={formValues.website} onChange={handleChange} />
+                            </div>
+                            <div className="form-group">
+                                <label>Current Company</label>
+                                <input name="company" type="text" placeholder="Company Name" value={formValues.company} onChange={handleChange} />
+                            </div>
+                            <div className="form-group">
+                                <label>Designation</label>
+                                <input name="designation" type="text" placeholder="Software Engineer / Manager" value={formValues.designation} onChange={handleChange} />
+                            </div>
+                            <div className="form-group">
+                                <label>Years of Experience</label>
+                                <input name="yearsExperience" type="number" placeholder="5" min="0" max="50" value={formValues.yearsExperience} onChange={handleChange} />
+                            </div>
                         </div>
 
                         <div className="form-group">
@@ -201,7 +232,7 @@ function RegisterCard(){
                         </div>
 
                         {error && (
-                            <div className="error-message" style={{ color: 'red', marginBottom: '16px', textAlign: 'center' }}>
+                            <div className="error-banner">
                                 {error}
                             </div>
                         )}

@@ -2,11 +2,14 @@ import React, { useEffect, useState } from "react"
 import "../css/LandingpageCSS/Navbar.css"
 import { useNavigate } from "react-router-dom";
 import logo from "./Landingpage/assets/logo.png";
+import NotificationSystem from "./NotificationSystem";
 
 function DashboardNavbar() {
     const navigate = useNavigate();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
 
     useEffect(() => {
         const onScroll = () => {
@@ -14,6 +17,24 @@ function DashboardNavbar() {
         };
         window.addEventListener("scroll", onScroll, { passive: true });
         return () => window.removeEventListener("scroll", onScroll);
+    }, []);
+
+    useEffect(() => {
+        // Get current user from localStorage
+        const alumni = localStorage.getItem('alumni');
+        const student = localStorage.getItem('student');
+        const recruiter = localStorage.getItem('recruiter');
+        const admin = localStorage.getItem('admin');
+        
+        if (alumni) {
+            setCurrentUser(JSON.parse(alumni));
+        } else if (student) {
+            setCurrentUser(JSON.parse(student));
+        } else if (recruiter) {
+            setCurrentUser(JSON.parse(recruiter));
+        } else if (admin) {
+            setCurrentUser(JSON.parse(admin));
+        }
     }, []);
 
     const handleNavigate = (path) => {
@@ -70,8 +91,26 @@ function DashboardNavbar() {
                     </ul>
                 </nav>
 
-                <div className="btn">
-                    <button className="logout-btn" onClick={handleLogout}>Logout</button>
+                <div className="navbar-actions">
+                    {currentUser && (
+                        <div className="notification-container">
+                            <button 
+                                className="notification-btn"
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                aria-label="Notifications"
+                            >
+                                🔔
+                            </button>
+                            {showNotifications && (
+                                <div className="notification-dropdown">
+                                    <NotificationSystem user={currentUser} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <div className="btn">
+                        <button className="logout-btn" onClick={handleLogout}>Logout</button>
+                    </div>
                 </div>
 
                 <button

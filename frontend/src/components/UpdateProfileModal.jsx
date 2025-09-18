@@ -9,12 +9,17 @@ function UpdateProfileModal({ isOpen, onClose, alumni, onProfileUpdated }) {
     degree: '',
     graduation_year: '',
     department: '',
+    batch: '',
     address: '',
     city: '',
     state: '',
     country: '',
     linkedin: '',
-    github: ''
+    github: '',
+    website: '',
+    company: '',
+    designation: '',
+    years_experience: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,12 +33,17 @@ function UpdateProfileModal({ isOpen, onClose, alumni, onProfileUpdated }) {
         degree: alumni.degree || '',
         graduation_year: alumni.graduation_year || '',
         department: alumni.department || '',
+        batch: alumni.batch || '',
         address: alumni.address || '',
         city: alumni.city || '',
         state: alumni.state || '',
         country: alumni.country || '',
         linkedin: alumni.linkedin || '',
-        github: alumni.github || ''
+        github: alumni.github || '',
+        website: alumni.website || '',
+        company: alumni.company || '',
+        designation: alumni.designation || '',
+        years_experience: alumni.years_experience || ''
       });
       setError('');
       setSuccess('');
@@ -169,17 +179,30 @@ function UpdateProfileModal({ isOpen, onClose, alumni, onProfileUpdated }) {
             </div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="department">Department</label>
-            <input
-              type="text"
-              id="department"
-              name="department"
-              value={formData.department}
-              onChange={handleChange}
-              placeholder="e.g., CSE, ECE, ME, CE"
-              required
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="department">Department</label>
+              <input
+                type="text"
+                id="department"
+                name="department"
+                value={formData.department}
+                onChange={handleChange}
+                placeholder="e.g., CSE, ECE, ME, CE"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="batch">Batch</label>
+              <input
+                type="text"
+                id="batch"
+                name="batch"
+                value={formData.batch}
+                onChange={handleChange}
+                placeholder="e.g., 2020-2024"
+              />
+            </div>
           </div>
 
           <div className="form-group">
@@ -254,6 +277,57 @@ function UpdateProfileModal({ isOpen, onClose, alumni, onProfileUpdated }) {
                 placeholder="https://github.com/username"
               />
             </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="website">Personal Website</label>
+            <input
+              type="url"
+              id="website"
+              name="website"
+              value={formData.website}
+              onChange={handleChange}
+              placeholder="https://yourwebsite.com"
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="company">Current Company</label>
+              <input
+                type="text"
+                id="company"
+                name="company"
+                value={formData.company}
+                onChange={handleChange}
+                placeholder="Company Name"
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="designation">Designation</label>
+              <input
+                type="text"
+                id="designation"
+                name="designation"
+                value={formData.designation}
+                onChange={handleChange}
+                placeholder="Software Engineer / Manager"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="years_experience">Years of Experience</label>
+            <input
+              type="number"
+              id="years_experience"
+              name="years_experience"
+              value={formData.years_experience}
+              onChange={handleChange}
+              placeholder="5"
+              min="0"
+              max="50"
+            />
           </div>
 
           <div className="form-actions">

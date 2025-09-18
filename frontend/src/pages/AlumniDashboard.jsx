@@ -3,6 +3,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UpcomingEvents from '../components/UpcomingEvents';
 import UpdateProfileModal from '../components/UpdateProfileModal';
+import EventRSVP from '../components/EventRSVP';
+import MentorshipModule from '../components/MentorshipModule';
+import DonationsModule from '../components/DonationsModule';
+import CareerUpdates from '../components/CareerUpdates';
+import RecommendationEngine from '../components/RecommendationEngine';
 import DashboardNavbar from '../components/DashboardNavbar';
 import Footer from '../components/Landingpage/Footer';
 import '../css/AlumniDashboard.css';
@@ -11,6 +16,7 @@ function AlumniDashboard(){
   const [alumni, setAlumni] = useState(null);
   const [msg, setMsg] = useState('');
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   const navigate = useNavigate();
 
   const handleReapply = () => {
@@ -95,7 +101,7 @@ function AlumniDashboard(){
     );
   }
 
-  if (alumni.status === 'declined'){
+  if (alumni.status === 'rejected'){
     return (
       <>
         <DashboardNavbar />
@@ -103,7 +109,7 @@ function AlumniDashboard(){
           <div className="status-container">
             <div className="status-card declined">
               <div className="status-icon">❌</div>
-              <h2>Registration Declined</h2>
+              <h2>Registration Rejected</h2>
               <p className='space'>Unfortunately, your registration request was not approved.</p>
               <div className="status-details">
                 <div className="detail-item">
@@ -143,93 +149,149 @@ function AlumniDashboard(){
             </div>
             <div className="profile-info">
               <h3>{alumni.name}</h3>
-              <p>{alumni.degree} • {alumni.graduation_year}</p>
+              <h5>{alumni.degree} • {alumni.graduation_year}</h5>
               <span className="status-badge approved">✓ Verified Alumni</span>
             </div>
           </div>
         </div>
 
         <div className="dashboard-content">
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-icon">🎓</div>
-              <div className="stat-info">
-                <div className="stat-number">{alumni.degree}</div>
-                <div className="stat-label">Degree</div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon">📅</div>
-              <div className="stat-info">
-                <div className="stat-number">{alumni.graduation_year}</div>
-                <div className="stat-label">Graduation Year</div>
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-icon">🏢</div>
-              <div className="stat-info">
-                <div className="stat-number">{alumni.department}</div>
-                <div className="stat-label">Department</div>
-              </div>
-            </div>
+          {/* Navigation Tabs */}
+          <div className="dashboard-tabs">
+            <button 
+              className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+              onClick={() => setActiveTab('overview')}
+            >
+              📊 Overview
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'events' ? 'active' : ''}`}
+              onClick={() => setActiveTab('events')}
+            >
+              📅 Events
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'mentorship' ? 'active' : ''}`}
+              onClick={() => setActiveTab('mentorship')}
+            >
+              🤝 Mentorship
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'donations' ? 'active' : ''}`}
+              onClick={() => setActiveTab('donations')}
+            >
+              💝 Donations
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'career' ? 'active' : ''}`}
+              onClick={() => setActiveTab('career')}
+            >
+              💼 Career Timeline
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'recommendations' ? 'active' : ''}`}
+              onClick={() => setActiveTab('recommendations')}
+            >
+              🎯 Recommendations
+            </button>
           </div>
 
-          {/* <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon">📅</div>
-              <h3>Upcoming Events</h3>
-              <p>Stay connected with alumni events and reunions</p>
-              <button className="btn btn-primary">View Events</button>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">💼</div>
-              <h3>Job Opportunities</h3>
-              <p>Explore career opportunities from fellow alumni</p>
-              <button className="btn btn-primary">Browse Jobs</button>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">🤝</div>
-              <h3>Networking</h3>
-              <p>Connect with alumni in your field</p>
-              <button className="btn btn-primary">Start Networking</button>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon">📚</div>
-              <h3>Mentorship</h3>
-              <p>Share knowledge and mentor students</p>
-              <button className="btn btn-primary">Get Involved</button>
-            </div>
-          </div> */}
+          {/* Tab Content */}
+          {activeTab === 'overview' && (
+            <>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <div className="stat-icon">🎓</div>
+                  <div className="stat-info">
+                    <div className="stat-number">{alumni.degree}</div>
+                    <div className="stat-label">Degree</div>
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-icon">📅</div>
+                  <div className="stat-info">
+                    <div className="stat-number">{alumni.graduation_year}</div>
+                    <div className="stat-label">Graduation Year</div>
+                  </div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-icon">🏢</div>
+                  <div className="stat-info">
+                    <div className="stat-number">{alumni.department}</div>
+                    <div className="stat-label">Department</div>
+                  </div>
+                </div>
+                {alumni.company && (
+                  <div className="stat-card">
+                    <div className="stat-icon">💼</div>
+                    <div className="stat-info">
+                      <div className="stat-number">{alumni.company}</div>
+                      <div className="stat-label">Current Company</div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-          <div className="quick-actions">
-            <h3>Quick Actions</h3>
-            <div className="actions-grid">
-              <button className="action-btn" onClick={handleUpdateProfile}>
-                <span className="action-icon">📝</span>
-                <span>Update Profile</span>
-              </button>
-              <button className="action-btn">
-                <span className="action-icon">📸</span>
-                <span>Share Memories</span>
-              </button>
-              <button className="action-btn" onClick={handleJoinDiscussions}>
-                <span className="action-icon">💬</span>
-                <span>Join Discussions</span>
-              </button>
-              <button className="action-btn">
-                <span className="action-icon">📊</span>
-                <span>View Analytics</span>
-              </button>
-            </div>
-          </div>
+              <div className="quick-actions">
+                <h3>Quick Actions</h3>
+                <div className="actions-grid">
+                  <button className="action-btn" onClick={handleUpdateProfile}>
+                    <span className="action-icon">📝</span>
+                    <span>Update Profile</span>
+                  </button>
+                  <button className="action-btn" onClick={() => setActiveTab('events')}>
+                    <span className="action-icon">📅</span>
+                    <span>View Events</span>
+                  </button>
+                  <button className="action-btn" onClick={() => setActiveTab('mentorship')}>
+                    <span className="action-icon">🤝</span>
+                    <span>Mentorship</span>
+                  </button>
+                  <button className="action-btn" onClick={() => setActiveTab('donations')}>
+                    <span className="action-icon">💝</span>
+                    <span>Donate</span>
+                  </button>
+                  <button className="action-btn" onClick={() => setActiveTab('career')}>
+                    <span className="action-icon">💼</span>
+                    <span>Career</span>
+                  </button>
+                </div>
+              </div>
 
-          {/* Events Section */}
-          <div className="events-section">
-            <h3 className="events-title">Upcoming Events</h3>
-            <div className="events-container">
-              <UpcomingEvents limit={3} />
+              {/* Recent Events Preview */}
+              <div className="events-section">
+                <h3 className="events-title">Upcoming Events</h3>
+                <div className="events-container">
+                  <UpcomingEvents limit={3} />
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'events' && (
+            <div className="events-section">
+              <h3 className="events-title">All Events</h3>
+              <div className="events-container">
+                <UpcomingEvents showRSVP={true} />
+              </div>
             </div>
-          </div>
+          )}
+
+          {activeTab === 'mentorship' && (
+            <MentorshipModule user={alumni} userRole="alumni" />
+          )}
+
+          {activeTab === 'donations' && (
+            <DonationsModule user={alumni} />
+          )}
+
+          {activeTab === 'career' && (
+            <CareerUpdates user={alumni} />
+          )}
+
+          {activeTab === 'recommendations' && (
+            <RecommendationEngine user={alumni} userRole="alumni" />
+          )}
         </div>
 
         {/* Update Profile Modal */}

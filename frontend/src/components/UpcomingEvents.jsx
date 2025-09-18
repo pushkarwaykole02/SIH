@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
+import EventRSVP from './EventRSVP';
 import '../css/UpcomingEvents.css';
 
-function UpcomingEvents({ limit = 5 }) {
+function UpcomingEvents({ limit = 5, showRSVP = false }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     fetchEvents();
+    // Get current user from localStorage
+    const userData = localStorage.getItem('alumni');
+    if (userData) {
+      try {
+        setCurrentUser(JSON.parse(userData));
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+      }
+    }
   }, []);
 
   const fetchEvents = async () => {
@@ -108,6 +119,17 @@ function UpcomingEvents({ limit = 5 }) {
                 <span className="event-venue">📍 {event.event_venue}</span>
                 <span className="event-time">🕒 {formatTime(event.event_time)}</span>
               </div>
+              
+              {showRSVP && currentUser && (
+                <EventRSVP 
+                  eventId={event.id} 
+                  userId={currentUser.id} 
+                  onRSVPChange={() => {
+                    // Optionally refresh RSVP counts
+                    console.log('RSVP updated for event:', event.id);
+                  }}
+                />
+              )}
             </div>
           </div>
         ))}

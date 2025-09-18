@@ -54,11 +54,36 @@ function LoginCard(){
                 // Store alumni data and redirect to dashboard immediately
                 localStorage.setItem('alumni', JSON.stringify(result.alumni));
                 navigate('/alumni-dashboard', { replace: true });
+            } else if (result.role === 'student') {
+                // Store student data and redirect to student dashboard
+                localStorage.setItem('student', JSON.stringify(result.user));
+                navigate('/student-dashboard', { replace: true });
+            } else if (result.role === 'recruiter') {
+                // Store recruiter data and redirect to recruiter dashboard
+                localStorage.setItem('recruiter', JSON.stringify(result.user));
+                navigate('/recruiter-dashboard', { replace: true });
             } else {
                 setError('Invalid response from server');
             }
         } catch (err) {
             console.error('Login error:', err); // Debug log
+            const message = err.message || '';
+            if (
+                message.toLowerCase().includes('registration not approved') ||
+                message.toLowerCase().includes('account is inactive')
+            ) {
+                try {
+                    const profile = await apiService.getAlumni(formData.email);
+                    if (profile?.status === 'pending') {
+                        navigate('/pending', { replace: true });
+                        return;
+                    }
+                    if (profile?.status === 'rejected') {
+                        navigate('/rejected', { replace: true });
+                        return;
+                    }
+                } catch (e) {}
+            }
             setError(err.message);
         } finally {
             setIsLoading(false);

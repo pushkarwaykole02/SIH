@@ -83,16 +83,16 @@ app.use('/uploads', express.static(uploadsDir));
 
 // Azure SQL Database configuration
 const azureConfig = {
-  server: process.env.AZURE_SQL_SERVER,
-  database: process.env.AZURE_SQL_DATABASE,
+  server: process.env.DB_SERVER || process.env.AZURE_SQL_SERVER,
+  database: process.env.DB_DATABASE || process.env.AZURE_SQL_DATABASE,
   // Prefer explicit SQL auth variables, fall back to AAD username/password
-  sqlUser: process.env.AZURE_SQL_USERNAME || null,
-  sqlPassword: process.env.AZURE_SQL_PASSWORD || null,
+  sqlUser: process.env.DB_USER || process.env.AZURE_SQL_USERNAME || null,
+  sqlPassword: process.env.DB_PASSWORD || process.env.AZURE_SQL_PASSWORD || null,
   aadUser: process.env.AZURE_AD_USERNAME || null,
   aadPassword: process.env.AZURE_AD_PASSWORD || null,
   options: {
-    encrypt: true,
-    trustServerCertificate: false,
+    encrypt: process.env.DB_ENCRYPT === 'true' || true,
+    trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === 'true' || false,
     enableArithAbort: true
   }
 };
@@ -208,34 +208,56 @@ async function initializeDatabase() {
   }
 }
 
-// On startup create alumni table if not exists
+// On startup create all required tables
 async function ensureTables() {
   if (!pool) return;
   
+  // Users table for role-based authentication
+  const createUsers = `
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Users' AND xtype='U')
+  CREATE TABLE Users (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    email NVARCHAR(255) UNIQUE NOT NULL,
+    password NVARCHAR(255) NOT NULL,
+    role NVARCHAR(50) NOT NULL CHECK (role IN ('admin', 'alumni', 'student', 'recruiter')),
+    status NVARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
+  );
+  `;
+
+  // Extended alumni table
   const createAlumni = `
   IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='alumni' AND xtype='U')
   CREATE TABLE alumni (
     id INT IDENTITY(1,1) PRIMARY KEY,
+    user_id INT FOREIGN KEY REFERENCES Users(id),
     name NVARCHAR(255) NOT NULL,
     email NVARCHAR(255) UNIQUE NOT NULL,
-    password NVARCHAR(255) NOT NULL,
     phone NVARCHAR(50),
     degree NVARCHAR(255),
     graduation_year INT,
     department NVARCHAR(255),
+    batch NVARCHAR(50),
     address NVARCHAR(500),
     city NVARCHAR(100),
     state NVARCHAR(100),
     country NVARCHAR(100),
     linkedin NVARCHAR(500),
     github NVARCHAR(500),
+    website NVARCHAR(500),
+    company NVARCHAR(255),
+    designation NVARCHAR(255),
+    years_experience INT,
     document_path NVARCHAR(500),
     document_original_name NVARCHAR(255),
-    status NVARCHAR(50) DEFAULT 'pending',
-    created_at DATETIME2 DEFAULT GETDATE()
+    status NVARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
   );
   `;
 
+  // Events table
   const createEvents = `
   IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='events' AND xtype='U')
   CREATE TABLE events (
@@ -245,16 +267,115 @@ async function ensureTables() {
     event_venue NVARCHAR(500) NOT NULL,
     event_date DATE NOT NULL,
     event_time TIME,
-    created_by NVARCHAR(255) DEFAULT 'admin',
+    created_by INT FOREIGN KEY REFERENCES Users(id),
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2 DEFAULT GETDATE()
   );
   `;
 
+  // Event RSVP table
+  const createEventRSVP = `
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Event_RSVP' AND xtype='U')
+  CREATE TABLE Event_RSVP (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    event_id INT FOREIGN KEY REFERENCES events(id) ON DELETE CASCADE,
+    user_id INT FOREIGN KEY REFERENCES Users(id) ON DELETE CASCADE,
+    rsvp_status NVARCHAR(50) NOT NULL CHECK (rsvp_status IN ('going', 'interested', 'not_going')),
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE(),
+    UNIQUE(event_id, user_id)
+  );
+  `;
+
+  // Mentorship table
+  const createMentorship = `
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Mentorship' AND xtype='U')
+  CREATE TABLE Mentorship (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    mentor_id INT FOREIGN KEY REFERENCES Users(id),
+    mentee_id INT FOREIGN KEY REFERENCES Users(id),
+    subject_area NVARCHAR(255),
+    description NVARCHAR(MAX),
+    status NVARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'completed')),
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
+  );
+  `;
+
+  // Donations table
+  const createDonations = `
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Donations' AND xtype='U')
+  CREATE TABLE Donations (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    donor_id INT FOREIGN KEY REFERENCES Users(id),
+    amount DECIMAL(10,2) NOT NULL,
+    payment_method NVARCHAR(50),
+    payment_id NVARCHAR(255),
+    status NVARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed', 'refunded')),
+    created_at DATETIME2 DEFAULT GETDATE()
+  );
+  `;
+
+  // Jobs table for recruiter postings
+  const createJobs = `
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Jobs' AND xtype='U')
+  CREATE TABLE Jobs (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    recruiter_id INT FOREIGN KEY REFERENCES Users(id),
+    title NVARCHAR(255) NOT NULL,
+    company NVARCHAR(255) NOT NULL,
+    description NVARCHAR(MAX) NOT NULL,
+    location NVARCHAR(255),
+    job_type NVARCHAR(50) CHECK (job_type IN ('full-time', 'part-time', 'internship', 'contract')),
+    salary_range NVARCHAR(100),
+    requirements NVARCHAR(MAX),
+    status NVARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'closed', 'draft')),
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
+  );
+  `;
+
+  // Notifications table
+  const createNotifications = `
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Notifications' AND xtype='U')
+  CREATE TABLE Notifications (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    user_id INT FOREIGN KEY REFERENCES Users(id) ON DELETE CASCADE,
+    title NVARCHAR(255) NOT NULL,
+    message NVARCHAR(MAX) NOT NULL,
+    type NVARCHAR(50) CHECK (type IN ('event', 'mentorship', 'donation', 'approval', 'general')),
+    is_read BIT DEFAULT 0,
+    created_at DATETIME2 DEFAULT GETDATE()
+  );
+  `;
+
+  // Career updates table for tracking job changes
+  const createCareerUpdates = `
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CareerUpdates' AND xtype='U')
+  CREATE TABLE CareerUpdates (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    alumni_id INT FOREIGN KEY REFERENCES alumni(id) ON DELETE CASCADE,
+    company NVARCHAR(255) NOT NULL,
+    designation NVARCHAR(255) NOT NULL,
+    start_date DATE,
+    end_date DATE,
+    is_current BIT DEFAULT 1,
+    description NVARCHAR(MAX),
+    created_at DATETIME2 DEFAULT GETDATE()
+  );
+  `;
+
   try {
+    await pool.request().query(createUsers);
     await pool.request().query(createAlumni);
     await pool.request().query(createEvents);
-    console.log("✅ Ensured tables exist in Azure SQL Database");
+    await pool.request().query(createEventRSVP);
+    await pool.request().query(createMentorship);
+    await pool.request().query(createDonations);
+    await pool.request().query(createJobs);
+    await pool.request().query(createNotifications);
+    await pool.request().query(createCareerUpdates);
+    console.log("✅ Ensured all tables exist in Azure SQL Database");
   } catch (err) {
     console.error("❌ Error creating tables:", err.message);
   }
@@ -330,8 +451,8 @@ app.use('/api', (req, res, next) => {
 // Register alumni with file upload
 app.post('/api/register', upload.single('document'), async (req, res) => {
   const {
-    name, email, password, phone, degree, graduation_year, department,
-    address, city, state, country, linkedin, github
+    name, email, password, phone, degree, graduation_year, department, batch,
+    address, city, state, country, linkedin, github, website, company, designation, years_experience
   } = req.body;
 
   if (!email || !password || !name) {
@@ -352,36 +473,119 @@ app.post('/api/register', upload.single('document'), async (req, res) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    const request = pool.request();
-    request.input('name', sql.NVarChar, name);
-    request.input('email', sql.NVarChar, email);
-    request.input('password', sql.NVarChar, hashedPassword);
-    request.input('phone', sql.NVarChar, phone);
-    request.input('degree', sql.NVarChar, degree);
-    request.input('graduation_year', sql.Int, graduation_year || null);
-    request.input('department', sql.NVarChar, department);
-    request.input('address', sql.NVarChar, address);
-    request.input('city', sql.NVarChar, city);
-    request.input('state', sql.NVarChar, state);
-    request.input('country', sql.NVarChar, country);
-    request.input('linkedin', sql.NVarChar, linkedin);
-    request.input('github', sql.NVarChar, github);
-    request.input('document_path', sql.NVarChar, req.file.path);
-    request.input('document_original_name', sql.NVarChar, req.file.originalname);
-    request.input('status', sql.NVarChar, 'pending');
+    // Check if a user already exists (reapply flow)
+    let userId = null;
+    const existingUserCheck = await pool.request()
+      .input('email', sql.NVarChar, email)
+      .query('SELECT id, role FROM Users WHERE email = @email');
 
-    const result = await request.query(`
-      INSERT INTO alumni (
-        name, email, password, phone, degree, graduation_year, department,
-        address, city, state, country, linkedin, github, document_path, document_original_name, status
-      ) VALUES (
-        @name, @email, @password, @phone, @degree, @graduation_year, @department,
-        @address, @city, @state, @country, @linkedin, @github, @document_path, @document_original_name, @status
-      );
-      SELECT SCOPE_IDENTITY() as id, * FROM alumni WHERE id = SCOPE_IDENTITY();
+    if (existingUserCheck.recordset.length > 0) {
+      // Email already exists – allow only if current state is reapply (alumni rejected)
+      userId = existingUserCheck.recordset[0].id;
+
+      const existingAlumni = await pool.request()
+        .input('user_id', sql.Int, userId)
+        .query('SELECT TOP 1 * FROM alumni WHERE user_id = @user_id');
+
+      if (existingAlumni.recordset.length === 0) {
+        // Inconsistent state; block duplicate email registration
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+
+      const currentStatus = existingAlumni.recordset[0].status;
+      if (currentStatus !== 'rejected') {
+        // Only rejected accounts may reapply
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+
+      // Reapply flow: update password and continue to update alumni to pending
+      await pool.request()
+        .input('id', sql.Int, userId)
+        .input('password', sql.NVarChar, hashedPassword)
+        .query('UPDATE Users SET password = @password WHERE id = @id');
+    } else {
+      // Create user account
+      const createUser = await pool.request()
+        .input('email', sql.NVarChar, email)
+        .input('password', sql.NVarChar, hashedPassword)
+        .input('role', sql.NVarChar, 'alumni')
+        .input('status', sql.NVarChar, 'active')
+        .query(`
+          INSERT INTO Users (email, password, role, status) 
+          VALUES (@email, @password, @role, @status);
+          SELECT SCOPE_IDENTITY() as user_id;
+        `);
+      userId = createUser.recordset[0].user_id;
+    }
+
+    // Then, create alumni profile
+    const alumniRequest = pool.request();
+    alumniRequest.input('user_id', sql.Int, userId);
+    alumniRequest.input('name', sql.NVarChar, name);
+    alumniRequest.input('email', sql.NVarChar, email);
+    alumniRequest.input('phone', sql.NVarChar, phone);
+    alumniRequest.input('degree', sql.NVarChar, degree);
+    alumniRequest.input('graduation_year', sql.Int, graduation_year || null);
+    alumniRequest.input('department', sql.NVarChar, department);
+    alumniRequest.input('batch', sql.NVarChar, batch);
+    alumniRequest.input('address', sql.NVarChar, address);
+    alumniRequest.input('city', sql.NVarChar, city);
+    alumniRequest.input('state', sql.NVarChar, state);
+    alumniRequest.input('country', sql.NVarChar, country);
+    alumniRequest.input('linkedin', sql.NVarChar, linkedin);
+    alumniRequest.input('github', sql.NVarChar, github);
+    alumniRequest.input('website', sql.NVarChar, website);
+    alumniRequest.input('company', sql.NVarChar, company);
+    alumniRequest.input('designation', sql.NVarChar, designation);
+    alumniRequest.input('years_experience', sql.Int, years_experience || null);
+    alumniRequest.input('document_path', sql.NVarChar, req.file.path);
+    alumniRequest.input('document_original_name', sql.NVarChar, req.file.originalname);
+
+    // If alumni already exists, update it; else insert new
+    const upsertResult = await alumniRequest.query(`
+      IF EXISTS (SELECT 1 FROM alumni WHERE user_id = @user_id)
+      BEGIN
+        UPDATE alumni SET
+          name = @name,
+          email = @email,
+          phone = @phone,
+          degree = @degree,
+          graduation_year = @graduation_year,
+          department = @department,
+          batch = @batch,
+          address = @address,
+          city = @city,
+          state = @state,
+          country = @country,
+          linkedin = @linkedin,
+          github = @github,
+          website = @website,
+          company = @company,
+          designation = @designation,
+          years_experience = @years_experience,
+          document_path = @document_path,
+          document_original_name = @document_original_name,
+          status = 'pending',
+          updated_at = GETDATE()
+        WHERE user_id = @user_id;
+        SELECT * FROM alumni WHERE user_id = @user_id;
+      END
+      ELSE
+      BEGIN
+        INSERT INTO alumni (
+          user_id, name, email, phone, degree, graduation_year, department, batch,
+          address, city, state, country, linkedin, github, website, company, designation, years_experience,
+          document_path, document_original_name, status
+        ) VALUES (
+          @user_id, @name, @email, @phone, @degree, @graduation_year, @department, @batch,
+          @address, @city, @state, @country, @linkedin, @github, @website, @company, @designation, @years_experience,
+          @document_path, @document_original_name, 'pending'
+        );
+        SELECT SCOPE_IDENTITY() as id, * FROM alumni WHERE id = SCOPE_IDENTITY();
+      END
     `);
     
-    res.json({ success: true, alumni: result.recordset[0] });
+    res.json({ success: true, alumni: upsertResult.recordset[0] });
   } catch (err) {
     console.error(err);
     // If database insert fails, delete the uploaded file
@@ -524,6 +728,13 @@ app.post('/api/admin/:id/approve', async (req, res) => {
     request2.input('id', sql.Int, id);
     await request2.query("UPDATE alumni SET status='approved' WHERE id = @id");
     
+    // Also ensure associated user account is active for login
+    if (alumni.user_id) {
+      const request3 = pool.request();
+      request3.input('user_id', sql.Int, alumni.user_id);
+      await request3.query("UPDATE Users SET status='active' WHERE id = @user_id");
+    }
+    
     // Send approval email
     const approvalEmailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -592,8 +803,15 @@ app.post('/api/admin/:id/decline', async (req, res) => {
     // Update status
     const request2 = pool.request();
     request2.input('id', sql.Int, id);
-    await request2.query("UPDATE alumni SET status='declined' WHERE id = @id");
-    
+    await request2.query("UPDATE alumni SET status='rejected' WHERE id = @id");
+
+    // Deactivate associated user to prevent login
+    if (alumni.user_id) {
+      const request3 = pool.request();
+      request3.input('user_id', sql.Int, alumni.user_id);
+      await request3.query("UPDATE Users SET status='inactive' WHERE id = @user_id");
+    }
+
     // Send decline email
     const declineEmailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -604,42 +822,14 @@ app.post('/api/admin/:id/decline', async (req, res) => {
         
         <div style="background: white; padding: 30px; border-radius: 10px; margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
           <h2 style="color: #0f172a; margin-top: 0;">Dear ${alumni.name},</h2>
-          
-          <p style="color: #475569; line-height: 1.6;">We regret to inform you that your AlumniConnect registration could not be approved at this time. This may be due to:</p>
-          
-          <ul style="color: #475569; line-height: 1.8;">
-            <li>📄 Document verification issues</li>
-            <li>📧 Incomplete information</li>
-            <li>🎓 Degree verification requirements</li>
-            <li>📋 Additional documentation needed</li>
-          </ul>
-          
-          <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
-            <h3 style="color: #92400e; margin-top: 0;">What's Next?</h3>
-            <p style="margin: 5px 0; color: #92400e;">You can reapply with the correct documentation or contact our support team for assistance.</p>
-          </div>
-          
-          <div style="text-align: center; margin-top: 30px;">
-            <a href="mailto:pushkarwaykole73@gmail.com" 
-               style="background: #6b7280; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; margin-right: 10px;">
-              Contact Support
-            </a>
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/register" 
-               style="background: #fb8500; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
-              Reapply Now
-            </a>
-          </div>
-          
-          <p style="color: #64748b; font-size: 14px; margin-top: 30px; text-align: center;">
-            For any questions or assistance, please contact us at pushkarwaykole73@gmail.com
-          </p>
+          <p style="color: #475569; line-height: 1.6;">We regret to inform you that your AlumniConnect registration could not be approved at this time.</p>
         </div>
       </div>
     `;
     
     await sendEmail(alumni.email, '📋 AlumniConnect Registration Update', declineEmailHtml);
     
-    res.json({ success: true, message: 'Alumni declined and email sent' });
+    res.json({ success: true, message: 'Alumni declined, user deactivated, and email sent' });
   } catch (err) {
     console.error('Error declining alumni:', err);
     res.status(500).json({ error: err.message });
@@ -725,30 +915,67 @@ app.post('/api/login', async (req, res) => {
 
   // Hardcoded admin check
   if (email === 'admin@admin.com' && password === 'admin') {
-    return res.json({ role: 'admin' });
+    return res.json({ role: 'admin', user: { id: 0, email: 'admin@admin.com', role: 'admin' } });
   }
 
   try {
     const request = pool.request();
     request.input('email', sql.NVarChar, email);
-    const result = await request.query('SELECT * FROM alumni WHERE email = @email');
+    const result = await request.query(`
+      SELECT 
+        u.id,
+        u.email,
+        u.password,
+        u.role,
+        u.status AS user_status,
+        a.*,
+        a.status AS alumni_status
+      FROM Users u
+      LEFT JOIN alumni a ON u.id = a.user_id
+      WHERE u.email = @email
+    `);
     
     if (result.recordset.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const alumni = result.recordset[0];
+    const user = result.recordset[0];
     
     // Verify the password using bcrypt
-    const isPasswordValid = await bcrypt.compare(password, alumni.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // If alumni exists and registration not approved, short-circuit with clear message
+    if (user.role === 'alumni' && user.alumni_status && user.alumni_status !== 'approved') {
+      return res.status(401).json({ error: 'Registration not approved' });
+    }
+
+    // Check if user is active
+    if (user.user_status !== 'active') {
+      return res.status(401).json({ error: 'Account is inactive' });
+    }
+
     // Remove password from response for security
-    delete alumni.password;
-    res.json({ role: 'alumni', alumni });
+    delete user.password;
+    
+    // Return appropriate data based on role
+    if (user.role === 'alumni' && user.id) {
+      // Return alumni data
+      // Normalize id so frontend can rely on user.user_id
+      user.user_id = user.user_id || user.id;
+      res.json({ role: 'alumni', user, alumni: user });
+    } else if (user.role === 'student') {
+      // Return student data
+      res.json({ role: 'student', user });
+    } else if (user.role === 'recruiter') {
+      // Return recruiter data
+      res.json({ role: 'recruiter', user });
+    } else {
+      res.json({ role: user.role, user });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -878,19 +1105,30 @@ async function sendEventNotificationEmails(eventData) {
 
 // Create event
 app.post('/api/events', async (req, res) => {
-  const { event_name, event_description, event_venue, event_date, event_time } = req.body;
+  let { event_name, event_description, event_venue, event_date, event_time } = req.body;
   
   try {
     const request = pool.request();
+    // Normalize inputs
+    const normalizedTime = (typeof event_time === 'string' && event_time.trim() !== '')
+      ? (event_time.length === 5 ? `${event_time}:00` : event_time)
+      : null;
+
     request.input('event_name', sql.NVarChar, event_name);
     request.input('event_description', sql.NVarChar, event_description);
     request.input('event_venue', sql.NVarChar, event_venue);
-    request.input('event_date', sql.Date, event_date);
-    request.input('event_time', sql.Time, event_time);
+    request.input('event_date', sql.Date, event_date || null);
+    request.input('event_time', sql.VarChar, normalizedTime);
 
     const result = await request.query(`
       INSERT INTO events (event_name, event_description, event_venue, event_date, event_time) 
-      VALUES (@event_name, @event_description, @event_venue, @event_date, @event_time);
+      VALUES (
+        @event_name, 
+        @event_description, 
+        @event_venue, 
+        @event_date, 
+        CASE WHEN @event_time IS NULL OR @event_time = '' THEN NULL ELSE CAST(@event_time AS time) END
+      );
       SELECT SCOPE_IDENTITY() as id, * FROM events WHERE id = SCOPE_IDENTITY();
     `);
     
@@ -1278,6 +1516,781 @@ app.delete('/api/events/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting event:', err);
     res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
+// ================= EVENT RSVP API ENDPOINTS ================= //
+
+// RSVP to an event
+app.post('/api/events/:id/rsvp', async (req, res) => {
+  const { id } = req.params;
+  const { user_id, rsvp_status } = req.body;
+  
+  if (!user_id || !rsvp_status) {
+    return res.status(400).json({ error: 'user_id and rsvp_status are required' });
+  }
+  
+  if (!['going', 'interested', 'not_going'].includes(rsvp_status)) {
+    return res.status(400).json({ error: 'Invalid rsvp_status. Must be: going, interested, or not_going' });
+  }
+  
+  try {
+    const request = pool.request();
+    request.input('event_id', sql.Int, id);
+    request.input('user_id', sql.Int, user_id);
+    request.input('rsvp_status', sql.NVarChar, rsvp_status);
+    
+    const result = await request.query(`
+      MERGE Event_RSVP AS target
+      USING (SELECT @event_id as event_id, @user_id as user_id, @rsvp_status as rsvp_status) AS source
+      ON target.event_id = source.event_id AND target.user_id = source.user_id
+      WHEN MATCHED THEN
+        UPDATE SET rsvp_status = source.rsvp_status, updated_at = GETDATE()
+      WHEN NOT MATCHED THEN
+        INSERT (event_id, user_id, rsvp_status) VALUES (source.event_id, source.user_id, source.rsvp_status);
+      
+      SELECT * FROM Event_RSVP WHERE event_id = @event_id AND user_id = @user_id;
+    `);
+    
+    res.json({ success: true, rsvp: result.recordset[0] });
+  } catch (err) {
+    console.error('Error updating RSVP:', err);
+    res.status(500).json({ error: 'Failed to update RSVP' });
+  }
+});
+
+// Get RSVP counts for an event
+app.get('/api/events/:id/rsvp-counts', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const request = pool.request();
+    request.input('event_id', sql.Int, id);
+    
+    const result = await request.query(`
+      SELECT 
+        rsvp_status,
+        COUNT(*) as count
+      FROM Event_RSVP 
+      WHERE event_id = @event_id 
+      GROUP BY rsvp_status
+    `);
+    
+    const counts = {
+      going: 0,
+      interested: 0,
+      not_going: 0
+    };
+    
+    result.recordset.forEach(row => {
+      counts[row.rsvp_status] = row.count;
+    });
+    
+    res.json({ success: true, counts });
+  } catch (err) {
+    console.error('Error getting RSVP counts:', err);
+    res.status(500).json({ error: 'Failed to get RSVP counts' });
+  }
+});
+
+// ================= MENTORSHIP API ENDPOINTS ================= //
+
+// Register as mentor
+app.post('/api/mentorship/register', async (req, res) => {
+  const { user_id, subject_areas, description } = req.body;
+  
+  if (!user_id || !subject_areas) {
+    return res.status(400).json({ error: 'user_id and subject_areas are required' });
+  }
+  
+  try {
+    const request = pool.request();
+    request.input('user_id', sql.Int, user_id);
+    request.input('subject_areas', sql.NVarChar, JSON.stringify(subject_areas));
+    request.input('description', sql.NVarChar, description);
+    
+    // For now, we'll just update the alumni profile with mentor status
+    // In a full implementation, you might want a separate mentors table
+    const result = await request.query(`
+      UPDATE alumni 
+      SET designation = ISNULL(designation, '') + ' | Mentor'
+      WHERE user_id = @user_id;
+      
+      SELECT * FROM alumni WHERE user_id = @user_id;
+    `);
+    
+    res.json({ success: true, message: 'Successfully registered as mentor' });
+  } catch (err) {
+    console.error('Error registering as mentor:', err);
+    res.status(500).json({ error: 'Failed to register as mentor' });
+  }
+});
+
+// Request mentorship
+app.post('/api/mentorship/request', async (req, res) => {
+  const { mentor_id, mentee_id, subject_area, description } = req.body;
+  
+  if (!mentor_id || !mentee_id || !subject_area) {
+    return res.status(400).json({ error: 'mentor_id, mentee_id, and subject_area are required' });
+  }
+  
+  try {
+    const request = pool.request();
+    request.input('mentor_id', sql.Int, mentor_id);
+    request.input('mentee_id', sql.Int, mentee_id);
+    request.input('subject_area', sql.NVarChar, subject_area);
+    request.input('description', sql.NVarChar, description);
+    
+    const result = await request.query(`
+      INSERT INTO Mentorship (mentor_id, mentee_id, subject_area, description, status)
+      VALUES (@mentor_id, @mentee_id, @subject_area, @description, 'pending');
+      SELECT SCOPE_IDENTITY() as id, * FROM Mentorship WHERE id = SCOPE_IDENTITY();
+    `);
+    
+    res.json({ success: true, mentorship: result.recordset[0] });
+  } catch (err) {
+    console.error('Error creating mentorship request:', err);
+    res.status(500).json({ error: 'Failed to create mentorship request' });
+  }
+});
+
+// Get mentorship requests for a user
+app.get('/api/mentorship/:user_id', async (req, res) => {
+  const { user_id } = req.params;
+  const { type } = req.query; // 'mentor' or 'mentee'
+  
+  try {
+    const request = pool.request();
+    request.input('user_id', sql.Int, user_id);
+    
+    let query = '';
+    if (type === 'mentor') {
+      query = `
+        SELECT m.*, a.name as mentee_name, a.email as mentee_email
+        FROM Mentorship m
+        JOIN alumni a ON m.mentee_id = a.user_id
+        WHERE m.mentor_id = @user_id
+        ORDER BY m.created_at DESC
+      `;
+    } else {
+      query = `
+        SELECT m.*, a.name as mentor_name, a.email as mentor_email
+        FROM Mentorship m
+        JOIN alumni a ON m.mentor_id = a.user_id
+        WHERE m.mentee_id = @user_id
+        ORDER BY m.created_at DESC
+      `;
+    }
+    
+    const result = await request.query(query);
+    res.json({ success: true, mentorships: result.recordset });
+  } catch (err) {
+    console.error('Error getting mentorship requests:', err);
+    res.status(500).json({ error: 'Failed to get mentorship requests' });
+  }
+});
+
+// Update mentorship status
+app.put('/api/mentorship/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  
+  if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+  
+  try {
+    const request = pool.request();
+    request.input('id', sql.Int, id);
+    request.input('status', sql.NVarChar, status);
+    
+    const result = await request.query(`
+      UPDATE Mentorship 
+      SET status = @status, updated_at = GETDATE()
+      WHERE id = @id;
+      SELECT * FROM Mentorship WHERE id = @id;
+    `);
+    
+    res.json({ success: true, mentorship: result.recordset[0] });
+  } catch (err) {
+    console.error('Error updating mentorship status:', err);
+    res.status(500).json({ error: 'Failed to update mentorship status' });
+  }
+});
+
+// ================= DONATIONS API ENDPOINTS ================= //
+
+// Create donation
+app.post('/api/donations', async (req, res) => {
+  const { donor_id, amount, payment_method, payment_id } = req.body;
+  
+  if (!donor_id || !amount) {
+    return res.status(400).json({ error: 'donor_id and amount are required' });
+  }
+  
+  try {
+    const request = pool.request();
+    request.input('donor_id', sql.Int, donor_id);
+    request.input('amount', sql.Decimal(10,2), amount);
+    request.input('payment_method', sql.NVarChar, payment_method);
+    request.input('payment_id', sql.NVarChar, payment_id);
+    request.input('status', sql.NVarChar, 'pending');
+    
+    const result = await request.query(`
+      INSERT INTO Donations (donor_id, amount, payment_method, payment_id, status)
+      VALUES (@donor_id, @amount, @payment_method, @payment_id, @status);
+      SELECT SCOPE_IDENTITY() as id, * FROM Donations WHERE id = SCOPE_IDENTITY();
+    `);
+    
+    res.json({ success: true, donation: result.recordset[0] });
+  } catch (err) {
+    console.error('Error creating donation:', err);
+    res.status(500).json({ error: 'Failed to create donation' });
+  }
+});
+
+// Get donations
+app.get('/api/donations', async (req, res) => {
+  const { donor_id, status } = req.query;
+  
+  try {
+    if (!pool) {
+      return res.status(503).json({ error: 'Database not connected' });
+    }
+
+    const request = pool.request();
+    let query = `
+      SELECT d.*, a.name as donor_name, a.email as donor_email
+      FROM Donations d
+      JOIN alumni a ON d.donor_id = a.user_id
+    `;
+    
+    const conditions = [];
+    if (donor_id) {
+      request.input('donor_id', sql.Int, donor_id);
+      conditions.push('d.donor_id = @donor_id');
+    }
+    if (status) {
+      request.input('status', sql.NVarChar, status);
+      conditions.push('d.status = @status');
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    query += ' ORDER BY d.created_at DESC';
+    
+    const result = await request.query(query);
+    res.json({ success: true, donations: result.recordset });
+  } catch (err) {
+    console.error('Error getting donations:', err);
+    res.status(500).json({ error: 'Failed to get donations' });
+  }
+});
+
+// ================= JOBS API ENDPOINTS ================= //
+
+// Create job posting
+app.post('/api/jobs', async (req, res) => {
+  const { recruiter_id, title, company, description, location, job_type, salary_range, requirements } = req.body;
+  
+  if (!recruiter_id || !title || !company || !description) {
+    return res.status(400).json({ error: 'recruiter_id, title, company, and description are required' });
+  }
+  
+  try {
+    const request = pool.request();
+    request.input('recruiter_id', sql.Int, recruiter_id);
+    request.input('title', sql.NVarChar, title);
+    request.input('company', sql.NVarChar, company);
+    request.input('description', sql.NVarChar, description);
+    request.input('location', sql.NVarChar, location);
+    request.input('job_type', sql.NVarChar, job_type);
+    request.input('salary_range', sql.NVarChar, salary_range);
+    request.input('requirements', sql.NVarChar, requirements);
+    request.input('status', sql.NVarChar, 'active');
+    
+    const result = await request.query(`
+      INSERT INTO Jobs (recruiter_id, title, company, description, location, job_type, salary_range, requirements, status)
+      VALUES (@recruiter_id, @title, @company, @description, @location, @job_type, @salary_range, @requirements, @status);
+      SELECT SCOPE_IDENTITY() as id, * FROM Jobs WHERE id = SCOPE_IDENTITY();
+    `);
+    
+    res.json({ success: true, job: result.recordset[0] });
+  } catch (err) {
+    console.error('Error creating job:', err);
+    res.status(500).json({ error: 'Failed to create job' });
+  }
+});
+
+// Get jobs
+app.get('/api/jobs', async (req, res) => {
+  const { recruiter_id, status, job_type } = req.query;
+  
+  try {
+    const request = pool.request();
+    let query = `
+      SELECT j.*, u.email as recruiter_email
+      FROM Jobs j
+      JOIN Users u ON j.recruiter_id = u.id
+    `;
+    
+    const conditions = [];
+    if (recruiter_id) {
+      request.input('recruiter_id', sql.Int, recruiter_id);
+      conditions.push('j.recruiter_id = @recruiter_id');
+    }
+    if (status) {
+      request.input('status', sql.NVarChar, status);
+      conditions.push('j.status = @status');
+    }
+    if (job_type) {
+      request.input('job_type', sql.NVarChar, job_type);
+      conditions.push('j.job_type = @job_type');
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    query += ' ORDER BY j.created_at DESC';
+    
+    const result = await request.query(query);
+    res.json({ success: true, jobs: result.recordset });
+  } catch (err) {
+    console.error('Error getting jobs:', err);
+    res.status(500).json({ error: 'Failed to get jobs' });
+  }
+});
+
+// ================= NOTIFICATIONS API ENDPOINTS ================= //
+
+// Get notifications for user
+app.get('/api/notifications/:user_id', async (req, res) => {
+  const { user_id } = req.params;
+  const { unread_only } = req.query;
+  
+  try {
+    const request = pool.request();
+    request.input('user_id', sql.Int, user_id);
+    
+    let query = 'SELECT * FROM Notifications WHERE user_id = @user_id';
+    
+    if (unread_only === 'true') {
+      query += ' AND is_read = 0';
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const result = await request.query(query);
+    res.json({ success: true, notifications: result.recordset });
+  } catch (err) {
+    console.error('Error getting notifications:', err);
+    res.status(500).json({ error: 'Failed to get notifications' });
+  }
+});
+
+// Mark notification as read
+app.put('/api/notifications/:id/read', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const request = pool.request();
+    request.input('id', sql.Int, id);
+    
+    const result = await request.query(`
+      UPDATE Notifications 
+      SET is_read = 1 
+      WHERE id = @id;
+      SELECT * FROM Notifications WHERE id = @id;
+    `);
+    
+    res.json({ success: true, notification: result.recordset[0] });
+  } catch (err) {
+    console.error('Error marking notification as read:', err);
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+// ================= ADMIN API ENDPOINTS ================= //
+
+// Get all alumni (for admin)
+app.get('/api/admin/all-alumni', async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({ error: 'Database not connected' });
+    }
+
+    const request = pool.request();
+    const result = await request.query(`
+      SELECT a.*, 'active' as user_status, 'alumni' as role
+      FROM alumni a
+      ORDER BY a.id DESC
+    `);
+    
+    res.json({ success: true, alumni: result.recordset });
+  } catch (err) {
+    console.error('Error getting all alumni:', err);
+    res.status(500).json({ error: 'Failed to get all alumni', details: err.message });
+  }
+});
+
+// Get all mentorships (for admin)
+app.get('/api/admin/mentorships', async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({ error: 'Database not connected' });
+    }
+
+    const request = pool.request();
+    const result = await request.query(`
+      SELECT m.*, 
+             mentor.name as mentor_name, 
+             mentee.name as mentee_name
+      FROM Mentorship m
+      LEFT JOIN alumni mentor ON m.mentor_id = mentor.user_id
+      LEFT JOIN alumni mentee ON m.mentee_id = mentee.user_id
+      ORDER BY m.created_at DESC
+    `);
+    
+    res.json({ success: true, mentorships: result.recordset });
+  } catch (err) {
+    console.error('Error getting all mentorships:', err);
+    res.status(500).json({ error: 'Failed to get all mentorships', details: err.message });
+  }
+});
+
+// ================= RECOMMENDATION API ENDPOINTS ================= //
+
+// Get mentor recommendations for user
+app.get('/api/recommendations/mentors/:user_id', async (req, res) => {
+  const { user_id } = req.params;
+  
+  try {
+    const request = pool.request();
+    request.input('user_id', sql.Int, user_id);
+    
+    // Get user's profile to match against mentors
+    const userResult = await request.query(`
+      SELECT a.*, u.role FROM alumni a
+      LEFT JOIN Users u ON a.user_id = u.id
+      WHERE a.user_id = @user_id
+    `);
+    
+    if (userResult.recordset.length === 0) {
+      return res.json({ success: true, mentors: [] });
+    }
+    
+    const user = userResult.recordset[0];
+    
+    // Find mentors with similar backgrounds
+    const mentorResult = await request.query(`
+      SELECT a.*, u.role,
+        CASE 
+          WHEN a.department = @department THEN 30
+          WHEN a.degree = @degree THEN 20
+          WHEN a.company LIKE '%' + @company + '%' THEN 15
+          ELSE 0
+        END as similarity_score,
+        CASE 
+          WHEN a.designation LIKE '%Mentor%' THEN 25
+          WHEN a.years_experience > 5 THEN 20
+          ELSE 10
+        END as popularity_score
+      FROM alumni a
+      LEFT JOIN Users u ON a.user_id = u.id
+      WHERE a.user_id != @user_id 
+        AND a.designation LIKE '%Mentor%'
+        AND u.status = 'active'
+      ORDER BY (similarity_score + popularity_score) DESC
+    `);
+    
+    const mentors = mentorResult.recordset.map(mentor => ({
+      ...mentor,
+      match_reasons: [
+        mentor.department === user.department ? 'Same department' : null,
+        mentor.degree === user.degree ? 'Same degree program' : null,
+        mentor.company && user.company && mentor.company.includes(user.company) ? 'Similar company background' : null,
+        mentor.years_experience > 5 ? 'Experienced professional' : null
+      ].filter(Boolean)
+    }));
+    
+    res.json({ success: true, mentors: mentors.slice(0, 5) });
+  } catch (err) {
+    console.error('Error getting mentor recommendations:', err);
+    res.status(500).json({ error: 'Failed to get mentor recommendations' });
+  }
+});
+
+// Get event recommendations for user
+app.get('/api/recommendations/events/:user_id', async (req, res) => {
+  const { user_id } = req.params;
+  
+  try {
+    const request = pool.request();
+    request.input('user_id', sql.Int, user_id);
+    
+    // Get user's profile
+    const userResult = await request.query(`
+      SELECT a.* FROM alumni a WHERE a.user_id = @user_id
+    `);
+    
+    if (userResult.recordset.length === 0) {
+      return res.json({ success: true, events: [] });
+    }
+    
+    const user = userResult.recordset[0];
+    
+    // Get upcoming events with relevance scoring
+    const eventResult = await request.query(`
+      SELECT e.*,
+        CASE 
+          WHEN e.title LIKE '%' + @department + '%' THEN 30
+          WHEN e.title LIKE '%' + @degree + '%' THEN 25
+          WHEN e.title LIKE '%' + @company + '%' THEN 20
+          WHEN e.description LIKE '%' + @department + '%' THEN 15
+          ELSE 5
+        END as relevance_score
+      FROM events e
+      WHERE e.date >= GETDATE()
+      ORDER BY relevance_score DESC, e.date ASC
+    `);
+    
+    const events = eventResult.recordset.map(event => ({
+      ...event,
+      match_reasons: [
+        event.title.includes(user.department) ? 'Related to your department' : null,
+        event.title.includes(user.degree) ? 'Related to your degree' : null,
+        event.title.includes(user.company) ? 'Related to your company' : null,
+        'Upcoming event in your area'
+      ].filter(Boolean)
+    }));
+    
+    res.json({ success: true, events: events.slice(0, 5) });
+  } catch (err) {
+    console.error('Error getting event recommendations:', err);
+    res.status(500).json({ error: 'Failed to get event recommendations' });
+  }
+});
+
+// Get job recommendations for user
+app.get('/api/recommendations/jobs/:user_id', async (req, res) => {
+  const { user_id } = req.params;
+  
+  try {
+    const request = pool.request();
+    request.input('user_id', sql.Int, user_id);
+    
+    // Get user's profile
+    const userResult = await request.query(`
+      SELECT a.* FROM alumni a WHERE a.user_id = @user_id
+    `);
+    
+    if (userResult.recordset.length === 0) {
+      return res.json({ success: true, jobs: [] });
+    }
+    
+    const user = userResult.recordset[0];
+    
+    // Get active jobs with relevance scoring
+    const jobResult = await request.query(`
+      SELECT j.*,
+        CASE 
+          WHEN j.title LIKE '%' + @designation + '%' THEN 40
+          WHEN j.company = @company THEN 35
+          WHEN j.description LIKE '%' + @department + '%' THEN 25
+          WHEN j.requirements LIKE '%' + @degree + '%' THEN 20
+          ELSE 10
+        END as relevance_score
+      FROM Jobs j
+      WHERE j.status = 'active'
+      ORDER BY relevance_score DESC, j.created_at DESC
+    `);
+    
+    const jobs = jobResult.recordset.map(job => ({
+      ...job,
+      match_reasons: [
+        job.title.includes(user.designation) ? 'Matches your current role' : null,
+        job.company === user.company ? 'Same company' : null,
+        job.description.includes(user.department) ? 'Related to your department' : null,
+        job.requirements.includes(user.degree) ? 'Requires your degree' : null
+      ].filter(Boolean)
+    }));
+    
+    res.json({ success: true, jobs: jobs.slice(0, 5) });
+  } catch (err) {
+    console.error('Error getting job recommendations:', err);
+    res.status(500).json({ error: 'Failed to get job recommendations' });
+  }
+});
+
+// Get alumni recommendations for networking
+app.get('/api/recommendations/alumni/:user_id', async (req, res) => {
+  const { user_id } = req.params;
+  
+  try {
+    const request = pool.request();
+    request.input('user_id', sql.Int, user_id);
+    
+    // Get user's profile
+    const userResult = await request.query(`
+      SELECT a.* FROM alumni a WHERE a.user_id = @user_id
+    `);
+    
+    if (userResult.recordset.length === 0) {
+      return res.json({ success: true, alumni: [] });
+    }
+    
+    const user = userResult.recordset[0];
+    
+    // Find alumni with similar backgrounds
+    const alumniResult = await request.query(`
+      SELECT a.*, u.status,
+        CASE 
+          WHEN a.department = @department THEN 35
+          WHEN a.degree = @degree THEN 30
+          WHEN a.company = @company THEN 25
+          WHEN a.graduation_year = @graduation_year THEN 20
+          WHEN a.batch = @batch THEN 15
+          ELSE 5
+        END as similarity_score
+      FROM alumni a
+      LEFT JOIN Users u ON a.user_id = u.id
+      WHERE a.user_id != @user_id 
+        AND u.status = 'active'
+      ORDER BY similarity_score DESC
+    `);
+    
+    const alumni = alumniResult.recordset.map(alumnus => ({
+      ...alumnus,
+      match_reasons: [
+        alumnus.department === user.department ? 'Same department' : null,
+        alumnus.degree === user.degree ? 'Same degree program' : null,
+        alumnus.company === user.company ? 'Same company' : null,
+        alumnus.graduation_year === user.graduation_year ? 'Same graduation year' : null,
+        alumnus.batch === user.batch ? 'Same batch' : null
+      ].filter(Boolean)
+    }));
+    
+    res.json({ success: true, alumni: alumni.slice(0, 5) });
+  } catch (err) {
+    console.error('Error getting alumni recommendations:', err);
+    res.status(500).json({ error: 'Failed to get alumni recommendations' });
+  }
+});
+
+// ================= HEALTH CHECK ENDPOINTS ================= //
+
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({ 
+        status: 'error', 
+        message: 'Database not connected',
+        database: 'disconnected'
+      });
+    }
+
+    // Test database connection
+    const request = pool.request();
+    const result = await request.query('SELECT 1 as test');
+    
+    res.json({ 
+      status: 'ok', 
+      message: 'Server and database are running',
+      database: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Health check error:', err);
+    res.status(503).json({ 
+      status: 'error', 
+      message: 'Database connection failed',
+      database: 'error',
+      error: err.message
+    });
+  }
+});
+
+// Database status endpoint
+app.get('/api/db-status', async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(503).json({ 
+        status: 'error', 
+        message: 'Database pool not initialized'
+      });
+    }
+
+    // Check if tables exist
+    const request = pool.request();
+    const tablesResult = await request.query(`
+      SELECT TABLE_NAME 
+      FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_TYPE = 'BASE TABLE'
+    `);
+    
+    const tables = tablesResult.recordset.map(row => row.TABLE_NAME);
+    
+    res.json({ 
+      status: 'ok', 
+      tables: tables,
+      tableCount: tables.length,
+      expectedTables: ['Users', 'alumni', 'events', 'Event_RSVP', 'Mentorship', 'Donations', 'Jobs', 'Notifications', 'CareerUpdates']
+    });
+  } catch (err) {
+    console.error('Database status error:', err);
+    res.status(503).json({ 
+      status: 'error', 
+      message: 'Database query failed',
+      error: err.message
+    });
+  }
+});
+
+// ================= ANALYTICS API ENDPOINTS ================= //
+
+// Get dashboard analytics
+app.get('/api/analytics/dashboard', async (req, res) => {
+  try {
+    const request = pool.request();
+    
+    // Get various counts
+    const alumniCount = await request.query("SELECT COUNT(*) as count FROM alumni WHERE status = 'approved'");
+    const pendingCount = await request.query("SELECT COUNT(*) as count FROM alumni WHERE status = 'pending'");
+    const eventsCount = await request.query("SELECT COUNT(*) as count FROM events");
+    const donationsCount = await request.query("SELECT COUNT(*) as count FROM Donations WHERE status = 'completed'");
+    const totalDonations = await request.query("SELECT SUM(amount) as total FROM Donations WHERE status = 'completed'");
+    const mentorshipCount = await request.query("SELECT COUNT(*) as count FROM Mentorship WHERE status = 'approved'");
+    const jobsCount = await request.query("SELECT COUNT(*) as count FROM Jobs WHERE status = 'active'");
+    
+    res.json({
+      success: true,
+      analytics: {
+        alumni: {
+          total: alumniCount.recordset[0].count,
+          pending: pendingCount.recordset[0].count
+        },
+        events: {
+          total: eventsCount.recordset[0].count
+        },
+        donations: {
+          count: donationsCount.recordset[0].count,
+          total: totalDonations.recordset[0].total || 0
+        },
+        mentorship: {
+          active: mentorshipCount.recordset[0].count
+        },
+        jobs: {
+          active: jobsCount.recordset[0].count
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Error getting analytics:', err);
+    res.status(500).json({ error: 'Failed to get analytics' });
   }
 });
 

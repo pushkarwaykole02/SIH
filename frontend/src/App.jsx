@@ -8,6 +8,11 @@ import FAQPage from "./pages/FAQPage";
 import AboutPage from "./pages/AboutPage";
 import AlumniDashboard from './pages/AlumniDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import StudentDashboard from './pages/StudentDashboard';
+import RecruiterDashboard from './pages/RecruiterDashboard';
+import PendingVerification from './pages/PendingVerification';
+import RejectedPage from './pages/RejectedPage';
+import StudentRegister from './pages/StudentRegister';
 
 function App() {
   return (
@@ -21,6 +26,11 @@ function App() {
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/alumni-dashboard" element={<AlumniDashboard />} />
+        <Route path="/student-dashboard" element={<StudentDashboard />} />
+        <Route path="/student-register" element={<StudentRegister />} />
+        <Route path="/recruiter-dashboard" element={<RecruiterDashboard />} />
+        <Route path="/pending" element={<PendingVerification />} />
+        <Route path="/rejected" element={<RejectedPage />} />
         <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
     </>
