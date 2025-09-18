@@ -6,9 +6,12 @@ function MentorshipModule({ user, userRole }) {
   const [mentorships, setMentorships] = useState([]);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [showMentorPicker, setShowMentorPicker] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [mentorSearch, setMentorSearch] = useState('');
+  const [mentors, setMentors] = useState([]);
 
   const [requestForm, setRequestForm] = useState({
     mentor_id: '',
@@ -18,7 +21,8 @@ function MentorshipModule({ user, userRole }) {
 
   const [registerForm, setRegisterForm] = useState({
     subject_areas: [],
-    description: ''
+    description: '',
+    mentor_links: {}
   });
 
   useEffect(() => {
@@ -67,6 +71,15 @@ function MentorshipModule({ user, userRole }) {
     }
   };
 
+  const loadMentors = async (term = '') => {
+    try {
+      const res = await apiService.listMentors(term);
+      setMentors(res.mentors || []);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     if (registerForm.subject_areas.length === 0) {
@@ -79,10 +92,11 @@ function MentorshipModule({ user, userRole }) {
       await apiService.registerAsMentor({
         user_id: parseInt(user.user_id || user.id, 10),
         subject_areas: registerForm.subject_areas,
-        description: registerForm.description
+        description: registerForm.description,
+        mentor_links: registerForm.mentor_links
       });
       setSuccess('Successfully registered as mentor!');
-      setRegisterForm({ subject_areas: [], description: '' });
+      setRegisterForm({ subject_areas: [], description: '', mentor_links: {} });
       setShowRegisterForm(false);
     } catch (err) {
       setError(err.message);
@@ -108,6 +122,19 @@ function MentorshipModule({ user, userRole }) {
     'Finance', 'Design', 'Other'
   ];
 
+  const updateLink = (area, field, value) => {
+    setRegisterForm(prev => ({
+      ...prev,
+      mentor_links: {
+        ...prev.mentor_links,
+        [area]: {
+          ...(prev.mentor_links?.[area] || {}),
+          [field]: value
+        }
+      }
+    }));
+  };
+
   const getStatusBadge = (status) => {
     const statusClasses = {
       pending: 'status-pending',
@@ -117,6 +144,13 @@ function MentorshipModule({ user, userRole }) {
     };
     return <span className={`status-badge ${statusClasses[status]}`}>{status}</span>;
   };
+
+  // Community links (configurable via env)
+  const DISCORD_LINK = import.meta.env.VITE_DISCORD_LINK || 'https://discord.gg/KG96wAZK';
+  const WHATSAPP_LINK = import.meta.env.VITE_WHATSAPP_LINK || 'https://chat.whatsapp.com/';
+  // Optional custom icons (public URL or relative to /public)
+  const DISCORD_ICON = import.meta.env.VITE_DISCORD_ICON || '/icons/discord.svg';
+  const WHATSAPP_ICON = import.meta.env.VITE_WHATSAPP_ICON || '/icons/whatsapp.svg';
 
   return (
     <div className="mentorship-module">
@@ -137,6 +171,14 @@ function MentorshipModule({ user, userRole }) {
               onClick={() => setShowRequestForm(true)}
             >
               Request Mentorship
+            </button>
+          )}
+          {userRole === 'student' && (
+            <button 
+              className="btn btn-primary"
+              onClick={() => { setShowMentorPicker(true); loadMentors(''); }}
+            >
+              Browse Mentors
             </button>
           )}
         </div>
@@ -166,13 +208,34 @@ function MentorshipModule({ user, userRole }) {
             <div key={mentorship.id} className="mentorship-card">
               <div className="mentorship-info">
                 <h4>
-                  {userRole === 'mentor' ? mentorship.mentee_name : mentorship.mentor_name}
+                  {userRole === 'alumni' ? mentorship.mentee_name : mentorship.mentor_name}
                 </h4>
                 <p className="mentorship-subject">{mentorship.subject_area}</p>
                 <p className="mentorship-description">{mentorship.description}</p>
-                <div className="mentorship-meta">
+              <div className="mentorship-meta">
                   <span>Requested: {new Date(mentorship.created_at).toLocaleDateString()}</span>
-                  {getStatusBadge(mentorship.status)}
+                  <div style={{display:'flex', alignItems:'center', gap: '8px'}}>
+                    {getStatusBadge(mentorship.status)}
+                    {userRole === 'student' && mentorship.status === 'approved' && (
+                      <div className="community-icons" style={{display:'flex', gap:'8px', marginLeft:'8px'}}>
+                        {(() => {
+                          const links = mentorship.community_links;
+                          const d = links?.discord || DISCORD_LINK;
+                          const w = links?.whatsapp || WHATSAPP_LINK;
+                          return (
+                            <>
+                              <a href={d} target="_blank" rel="noreferrer" title="Join Discord" className="community-icon">
+                                <img src={DISCORD_ICON} alt="Discord" />
+                              </a>
+                              <a href={w} target="_blank" rel="noreferrer" title="Join WhatsApp" className="community-icon">
+                                <img src={WHATSAPP_ICON} alt="WhatsApp" />
+                              </a>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
@@ -200,13 +263,13 @@ function MentorshipModule({ user, userRole }) {
       {/* Request Mentorship Modal */}
       {showRequestForm && (
         <div className="modal-overlay" onClick={() => setShowRequestForm(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content request-mentorship-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Request Mentorship</h3>
               <button className="modal-close" onClick={() => setShowRequestForm(false)}>×</button>
             </div>
             <form onSubmit={handleRequestSubmit} className="mentorship-form">
-              <div className="form-group">
+              <div className="form-group edge-align">
                 <label>Mentor ID</label>
                 <input
                   type="number"
@@ -215,8 +278,9 @@ function MentorshipModule({ user, userRole }) {
                   placeholder="Enter mentor ID"
                   required
                 />
+                <button type="button" className="btn btn-info pick-btn" onClick={() => { setShowMentorPicker(true); loadMentors(mentorSearch); }}>Pick from list</button>
               </div>
-              <div className="form-group">
+              <div className="form-group edge-align">
                 <label>Subject Area</label>
                 <input
                   type="text"
@@ -226,7 +290,7 @@ function MentorshipModule({ user, userRole }) {
                   required
                 />
               </div>
-              <div className="form-group">
+              <div className="form-group edge-align">
                 <label>Description</label>
                 <textarea
                   value={requestForm.description}
@@ -251,7 +315,7 @@ function MentorshipModule({ user, userRole }) {
       {/* Register as Mentor Modal */}
       {showRegisterForm && (
         <div className="modal-overlay" onClick={() => setShowRegisterForm(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content register-mentor-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Register as Mentor</h3>
               <button className="modal-close" onClick={() => setShowRegisterForm(false)}>×</button>
@@ -294,6 +358,29 @@ function MentorshipModule({ user, userRole }) {
                   rows="4"
                 />
               </div>
+              {registerForm.subject_areas.length > 0 && (
+                <div className="form-group">
+                  <label>Community Links per Subject</label>
+                  {registerForm.subject_areas.map(area => (
+                    <div key={area} className="subject-links-row">
+                      <strong style={{minWidth:'180px', display:'inline-block'}}>{area}</strong>
+                      <input
+                        type="url"
+                        placeholder="Discord invite URL"
+                        value={registerForm.mentor_links?.[area]?.discord || ''}
+                        onChange={(e) => updateLink(area, 'discord', e.target.value)}
+                        style={{marginRight:'8px'}}
+                      />
+                      <input
+                        type="url"
+                        placeholder="WhatsApp invite URL"
+                        value={registerForm.mentor_links?.[area]?.whatsapp || ''}
+                        onChange={(e) => updateLink(area, 'whatsapp', e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="form-actions">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowRegisterForm(false)}>
                   Cancel
@@ -303,6 +390,52 @@ function MentorshipModule({ user, userRole }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Mentor Picker Modal */}
+      {showMentorPicker && (
+        <div className="modal-overlay" onClick={() => setShowMentorPicker(false)}>
+          <div className="modal-content mentor-picker-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Select a Mentor</h3>
+              <button className="modal-close" onClick={() => setShowMentorPicker(false)}>×</button>
+            </div>
+            <div className="mentorship-form">
+              <div className="form-group">
+                <label>Search</label>
+                <input
+                  type="text"
+                  value={mentorSearch}
+                  onChange={(e) => { setMentorSearch(e.target.value); loadMentors(e.target.value); }}
+                  placeholder="Search by name, email, department"
+                />
+              </div>
+              <div className="mentors-list" style={{maxHeight: '300px', overflowY: 'auto'}}>
+                {mentors.map(m => (
+                  <div key={m.user_id} className="mentorship-card" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <div>
+                      <h4>{m.name}</h4>
+                      <ul style={{margin:'6px 0 0 0', paddingLeft:'18px'}}>
+                        <li><strong>Department:</strong> {m.department || 'N/A'}</li>
+                        <li><strong>Subject Areas:</strong> {(() => { try { const arr = typeof m.mentor_subjects === 'string' ? JSON.parse(m.mentor_subjects) : (m.mentor_subjects || []); return Array.isArray(arr) ? arr.join(', ') : 'N/A'; } catch { return 'N/A'; } })()}</li>
+                        <li><strong>Email:</strong> {m.email}</li>
+                      </ul>
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => { setRequestForm({...requestForm, mentor_id: m.user_id}); setShowMentorPicker(false); }}
+                    >
+                      Select
+                    </button>
+                  </div>
+                ))}
+                {mentors.length === 0 && (
+                  <div className="empty-state"><p>No mentors found.</p></div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

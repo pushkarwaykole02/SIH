@@ -37,11 +37,12 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 40px;
-    padding: 30px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 20px;
-    color: white;
-    box-shadow: 0 10px 25px -5px rgba(102, 126, 234, 0.3);
+    padding: 24px;
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .welcome-section {
@@ -52,48 +53,55 @@
     font-size: 32px;
     font-weight: 800;
     margin: 0 0 8px 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(90deg, #0f172a, #1f2937);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
 }
 
 .welcome-subtitle {
-    font-size: 18px;
+    font-size: 16px;
     margin: 0;
-    opacity: 0.9;
+    color: var(--color-text-muted);
+    text-align: left;
 }
 
 .profile-card {
     display: flex;
     align-items: center;
     gap: 16px;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 20px;
-    border-radius: 16px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: linear-gradient(135deg, #fde047, #fb923c);
+    padding: 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(251, 146, 60, 0.35);
+    box-shadow: 0 10px 20px rgba(251, 146, 60, 0.25);
+    color: #111827;
 }
 
 .profile-avatar {
     width: 60px;
     height: 60px;
-    background: rgba(255, 255, 255, 0.2);
     border-radius: 50%;
+    background: linear-gradient(135deg, #fb8500, #f97316);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
-    font-weight: 700;
     color: white;
+    font-weight: 800;
+    font-size: 24px;
+    box-shadow: 0 8px 20px rgba(251, 133, 0, 0.3);
 }
 
 .profile-info h3 {
     margin: 0 0 4px 0;
-    font-size: 20px;
-    font-weight: 600;
+    color: #111827;
+    font-size: 18px;
+    font-weight: 700;
 }
 
 .profile-info p {
     margin: 0 0 8px 0;
-    opacity: 0.9;
+    color: rgba(17, 24, 39, 0.8);
     font-size: 14px;
 }
 
@@ -107,9 +115,9 @@
 }
 
 .status-badge.student {
-    background: rgba(34, 197, 94, 0.2);
-    color: #22c55e;
-    border: 1px solid rgba(34, 197, 94, 0.3);
+    background: #d1fae5;
+    color: #059669;
+    border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 /* Dashboard Content */
@@ -348,4 +356,39 @@
     .events-title {
         font-size: 20px;
     }
+}
+
+/* Force student header mini-card to the warm yellow style (match alumni card) */
+.student-dashboard .profile-card {
+    background: linear-gradient(135deg, #ffffff, #ffffff) !important;
+    border-color: rgba(143, 139, 137, 0.35) !important;
+    box-shadow: 0 10px 20px rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+    gap: 20px;
+}
+
+.student-dashboard .profile-card .profile-avatar {
+    background: linear-gradient(135deg, #fb8500, #f97316) !important;
+    color: #ffffff !important;
+    box-shadow: 0 8px 20px rgba(251, 133, 0, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+}
+
+.student-dashboard .profile-card .profile-info h3 {
+    color: #111827 !important;
+    text-align: center !important;
+}
+
+.student-dashboard .profile-card .profile-info h5 {
+    color: rgba(17, 24, 39, 0.85) !important;
+    text-align: center !important;
+    margin-left: 0 !important;
+}
+
+.student-dashboard .profile-card .status-badge.student {
+    background: #d1fae5 !important;
+    color: #059669 !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    letter-spacing: 0.6px !important;
+    font-weight: 600 !important;
 }

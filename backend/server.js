@@ -596,6 +596,76 @@ app.post('/api/register', upload.single('document'), async (req, res) => {
   }
 });
 
+// Register student (simplified registration without document upload)
+app.post('/api/student/register', async (req, res) => {
+  const {
+    name, email, password, phone, department, linkedin
+  } = req.body;
+
+  if (!email || !password || !name || !department) {
+    return res.status(400).json({ error: 'name, email, password, and department are required' });
+  }
+
+  // Validate .edu email (accepts .edu, .edu.in, .edu.au, etc.)
+  if (!email.match(/\.edu(\.[a-z]{2,3})?$/i)) {
+    return res.status(400).json({ error: 'Student registration requires a .edu email address' });
+  }
+
+  // Validate phone number (10 digits only)
+  if (phone && !/^\d{10}$/.test(phone)) {
+    return res.status(400).json({ error: 'Phone number must be exactly 10 digits' });
+  }
+
+  try {
+    // Check if email already exists
+    const existingUserCheck = await pool.request()
+      .input('email', sql.NVarChar, email)
+      .query('SELECT id FROM Users WHERE email = @email');
+
+    if (existingUserCheck.recordset.length > 0) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+
+    // Hash the password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create user account with role 'student'
+    const createUser = await pool.request()
+      .input('email', sql.NVarChar, email)
+      .input('password', sql.NVarChar, hashedPassword)
+      .input('role', sql.NVarChar, 'student')
+      .input('status', sql.NVarChar, 'active')
+      .query(`
+        INSERT INTO Users (email, password, role, status) 
+        VALUES (@email, @password, @role, @status);
+        SELECT SCOPE_IDENTITY() as user_id;
+      `);
+    
+    const userId = createUser.recordset[0].user_id;
+
+    // Create student profile with only required fields
+    const studentRequest = pool.request();
+    studentRequest.input('user_id', sql.Int, userId);
+    studentRequest.input('name', sql.NVarChar, name);
+    studentRequest.input('email', sql.NVarChar, email);
+    studentRequest.input('phone', sql.NVarChar, phone);
+    studentRequest.input('department', sql.NVarChar, department);
+    studentRequest.input('linkedin', sql.NVarChar, linkedin || '');
+
+    const studentResult = await studentRequest.query(`
+      INSERT INTO students (user_id, name, email, phone, department, linkedin)
+      VALUES (@user_id, @name, @email, @phone, @department, @linkedin);
+      SELECT SCOPE_IDENTITY() as id, * FROM students WHERE id = SCOPE_IDENTITY();
+    `);
+    
+    res.json({ success: true, student: studentResult.recordset[0] });
+  } catch (err) {
+    console.error('Student registration error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get alumni by email (for login / dashboard)
 app.get('/api/alumni', async (req, res) => {
   const email = req.query.email;
@@ -929,9 +999,14 @@ app.post('/api/login', async (req, res) => {
         u.role,
         u.status AS user_status,
         a.*,
-        a.status AS alumni_status
+        a.status AS alumni_status,
+        s.name AS student_name,
+        s.phone AS student_phone,
+        s.department AS student_department,
+        s.linkedin AS student_linkedin
       FROM Users u
       LEFT JOIN alumni a ON u.id = a.user_id
+      LEFT JOIN students s ON u.id = s.user_id
       WHERE u.email = @email
     `);
     
@@ -968,8 +1043,19 @@ app.post('/api/login', async (req, res) => {
       user.user_id = user.user_id || user.id;
       res.json({ role: 'alumni', user, alumni: user });
     } else if (user.role === 'student') {
-      // Return student data
-      res.json({ role: 'student', user });
+      // Return student data with profile information
+      console.log('Student login - raw user data:', user); // Debug log
+      const studentData = {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.student_name,
+        phone: user.student_phone,
+        department: user.student_department,
+        linkedin: user.student_linkedin
+      };
+      console.log('Student login - processed data:', studentData); // Debug log
+      res.json({ role: 'student', user: studentData });
     } else if (user.role === 'recruiter') {
       // Return recruiter data
       res.json({ role: 'recruiter', user });
@@ -1597,7 +1683,7 @@ app.get('/api/events/:id/rsvp-counts', async (req, res) => {
 
 // Register as mentor
 app.post('/api/mentorship/register', async (req, res) => {
-  const { user_id, subject_areas, description } = req.body;
+  const { user_id, subject_areas, description, mentor_links } = req.body;
   
   if (!user_id || !subject_areas) {
     return res.status(400).json({ error: 'user_id and subject_areas are required' });
@@ -1607,16 +1693,35 @@ app.post('/api/mentorship/register', async (req, res) => {
     const request = pool.request();
     request.input('user_id', sql.Int, user_id);
     request.input('subject_areas', sql.NVarChar, JSON.stringify(subject_areas));
-    request.input('description', sql.NVarChar, description);
+    request.input('description', sql.NVarChar, description || null);
+    request.input('mentor_links', sql.NVarChar, mentor_links ? JSON.stringify(mentor_links) : null);
     
-    // For now, we'll just update the alumni profile with mentor status
-    // In a full implementation, you might want a separate mentors table
-    const result = await request.query(`
+    // Ensure an explicit mentor flag exists, then set it
+    await request.query(`
+      IF COL_LENGTH('alumni','is_mentor') IS NULL 
+      BEGIN
+        ALTER TABLE alumni ADD is_mentor BIT NOT NULL CONSTRAINT DF_alumni_is_mentor DEFAULT 0;
+      END
+    `);
+    await request.query(`
+      IF COL_LENGTH('alumni','mentor_subjects') IS NULL 
+      BEGIN
+        ALTER TABLE alumni ADD mentor_subjects NVARCHAR(MAX) NULL;
+      END;
+      IF COL_LENGTH('alumni','mentor_bio') IS NULL 
+      BEGIN
+        ALTER TABLE alumni ADD mentor_bio NVARCHAR(MAX) NULL;
+      END;
+      IF COL_LENGTH('alumni','mentor_links') IS NULL 
+      BEGIN
+        ALTER TABLE alumni ADD mentor_links NVARCHAR(MAX) NULL;
+      END;
       UPDATE alumni 
-      SET designation = ISNULL(designation, '') + ' | Mentor'
+      SET is_mentor = 1,
+          mentor_subjects = @subject_areas,
+          mentor_bio = @description,
+          mentor_links = CASE WHEN @mentor_links IS NULL THEN mentor_links ELSE @mentor_links END
       WHERE user_id = @user_id;
-      
-      SELECT * FROM alumni WHERE user_id = @user_id;
     `);
     
     res.json({ success: true, message: 'Successfully registered as mentor' });
@@ -1666,15 +1771,18 @@ app.get('/api/mentorship/:user_id', async (req, res) => {
     let query = '';
     if (type === 'mentor') {
       query = `
-        SELECT m.*, a.name as mentee_name, a.email as mentee_email
+        SELECT m.*, s.name as mentee_name, s.email as mentee_email,
+               mentor.mentor_links as mentor_links
         FROM Mentorship m
-        JOIN alumni a ON m.mentee_id = a.user_id
+        JOIN students s ON m.mentee_id = s.user_id
+        LEFT JOIN alumni mentor ON m.mentor_id = mentor.user_id
         WHERE m.mentor_id = @user_id
         ORDER BY m.created_at DESC
       `;
     } else {
       query = `
-        SELECT m.*, a.name as mentor_name, a.email as mentor_email
+        SELECT m.*, a.name as mentor_name, a.email as mentor_email,
+               a.mentor_links as mentor_links
         FROM Mentorship m
         JOIN alumni a ON m.mentor_id = a.user_id
         WHERE m.mentee_id = @user_id
@@ -1683,7 +1791,39 @@ app.get('/api/mentorship/:user_id', async (req, res) => {
     }
     
     const result = await request.query(query);
-    res.json({ success: true, mentorships: result.recordset });
+    // Parse mentor_links JSON if present and attach subject-specific links
+    const rows = result.recordset.map(r => {
+      let links = null;
+      try {
+        if (r.mentor_links) {
+          const all = typeof r.mentor_links === 'string' ? JSON.parse(r.mentor_links) : r.mentor_links;
+          if (all && r.subject_area) {
+            const subject = String(r.subject_area).trim().toLowerCase();
+            // 1) Exact key match (case-insensitive)
+            const exactKey = Object.keys(all).find(k => String(k).trim().toLowerCase() === subject);
+            if (exactKey) {
+              links = all[exactKey];
+            } else {
+              // 2) Substring match either direction
+              const fuzzyKey = Object.keys(all).find(k => {
+                const kk = String(k).trim().toLowerCase();
+                return kk.includes(subject) || subject.includes(kk);
+              });
+              if (fuzzyKey) {
+                links = all[fuzzyKey];
+              }
+              // 3) Fallback to the first provided set of links
+              if (!links) {
+                const firstKey = Object.keys(all)[0];
+                if (firstKey) links = all[firstKey];
+              }
+            }
+          }
+        }
+      } catch {}
+      return { ...r, community_links: links };
+    });
+    res.json({ success: true, mentorships: rows });
   } catch (err) {
     console.error('Error getting mentorship requests:', err);
     res.status(500).json({ error: 'Failed to get mentorship requests' });
@@ -1715,6 +1855,32 @@ app.put('/api/mentorship/:id/status', async (req, res) => {
   } catch (err) {
     console.error('Error updating mentorship status:', err);
     res.status(500).json({ error: 'Failed to update mentorship status' });
+  }
+});
+
+// List mentors directory (basic): alumni marked as mentors
+app.get('/api/mentors', async (req, res) => {
+  const { search } = req.query; // optional search by name/email/department
+  try {
+    const request = pool.request();
+    // Prefer explicit mentor flag; fallback to designation text only if column missing
+    let where = "WHERE (CASE WHEN COL_LENGTH('alumni','is_mentor') IS NOT NULL THEN a.is_mentor ELSE CASE WHEN a.designation LIKE '%Mentor%' THEN 1 ELSE 0 END END) = 1";
+    if (search && search.trim()) {
+      request.input('search', sql.NVarChar, `%${search.trim()}%`);
+      where += " AND (a.name LIKE @search OR a.email LIKE @search OR a.department LIKE @search OR (CASE WHEN COL_LENGTH('alumni','mentor_subjects') IS NOT NULL THEN a.mentor_subjects ELSE '' END) LIKE @search)";
+    }
+    const result = await request.query(`
+      SELECT TOP 50 a.user_id, a.name, a.email, a.department, a.designation, 
+             CASE WHEN COL_LENGTH('alumni','is_mentor') IS NOT NULL THEN a.is_mentor ELSE NULL END as is_mentor,
+             CASE WHEN COL_LENGTH('alumni','mentor_subjects') IS NOT NULL THEN a.mentor_subjects ELSE NULL END as mentor_subjects
+      FROM alumni a
+      ${where}
+      ORDER BY a.name ASC
+    `);
+    res.json({ success: true, mentors: result.recordset });
+  } catch (err) {
+    console.error('Error listing mentors:', err);
+    res.status(500).json({ error: 'Failed to fetch mentors' });
   }
 });
 
@@ -1947,10 +2113,11 @@ app.get('/api/admin/mentorships', async (req, res) => {
     const result = await request.query(`
       SELECT m.*, 
              mentor.name as mentor_name, 
-             mentee.name as mentee_name
+             COALESCE(s.name, mentee.name) as mentee_name
       FROM Mentorship m
       LEFT JOIN alumni mentor ON m.mentor_id = mentor.user_id
       LEFT JOIN alumni mentee ON m.mentee_id = mentee.user_id
+      LEFT JOIN students s ON m.mentee_id = s.user_id
       ORDER BY m.created_at DESC
     `);
     

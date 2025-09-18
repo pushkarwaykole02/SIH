@@ -66,6 +66,12 @@
     font-weight: 600;
 }
 
+.required-indicator {
+    color: #f59e0b;
+    font-size: 12px;
+    font-weight: 500;
+}
+
 .form-group input{
     padding: 10px;
     border-radius: 8px;
@@ -120,6 +126,172 @@
 }
 
 .registerBtn:hover{ background: #ffa239; }
+
+.register-divider {
+    display: flex;
+    align-items: center;
+    margin: 20px 0;
+    width: 86%;
+}
+
+.register-divider::before,
+.register-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.register-divider span {
+    padding: 0 16px;
+    color: #6b7280;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.student-register-btn {
+    width: 86%;
+    padding: 12px;
+    background: transparent;
+    color: #FB8500;
+    border: 2px solid #FB8500;
+    border-radius: 8px;
+    font-weight: 950;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.student-register-btn:hover {
+    background: #FB8500;
+    color: white;
+}
+
+/* Role Selection Styles */
+.role-selection {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.role-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #1f2937;
+}
+
+.role-buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    width: 86%;
+    margin-left: 0;
+    margin-right: 100px;
+}
+
+.role-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    text-align: left;
+}
+
+.role-btn:hover {
+    border-color: #FB8500;
+    box-shadow: 0 4px 12px rgba(251, 133, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.alumni-btn:hover {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+}
+
+.student-btn:hover {
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+}
+
+.role-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+}
+
+.role-content h4 {
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.role-content p {
+    margin: 0;
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.4;
+}
+
+/* Role Selected Header */
+.role-selected {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border-radius: 8px;
+    border: 1px solid #f59e0b;
+    width: 78%;
+    margin-left: 0;
+    margin-right: 100px;
+}
+
+.selected-role {
+    font-size: 16px;
+    font-weight: 600;
+    color: #92400e;
+    
+}
+
+.change-role-btn {
+    background: transparent;
+    border: 1px solid #f59e0b;
+    color: #92400e;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.change-role-btn:hover {
+    background: #f59e0b;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .role-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .role-btn {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .role-selected {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+    }
+}
 
 /* Error banner fits container width and style */
 .error-banner{

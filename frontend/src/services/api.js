@@ -27,6 +27,29 @@ export const apiService = {
     }
   },
 
+  // Register student
+  async registerStudent(studentData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/student/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(studentData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Student registration failed');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Student registration error:', error);
+      throw error;
+    }
+  },
+
   // Login alumni
   async loginAlumni(email, password) {
     try {
@@ -433,6 +456,24 @@ export const apiService = {
       return await response.json();
     } catch (error) {
       console.error('Update mentorship status error:', error);
+      throw error;
+    }
+  },
+
+  // List mentors (directory)
+  async listMentors(searchTerm = '') {
+    try {
+      const url = searchTerm
+        ? `${API_BASE_URL}/api/mentors?search=${encodeURIComponent(searchTerm)}`
+        : `${API_BASE_URL}/api/mentors`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch mentors');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('List mentors error:', error);
       throw error;
     }
   },

@@ -70,6 +70,12 @@ function AdminDashboard(){
     }
   };
 
+  const getMenteesCountForMentor = (row) => {
+    const key = row.mentor_id ?? row.mentor_user_id ?? row.mentor_name;
+    if (!key) return 0;
+    return mentorships.filter(m => (m.mentor_id ?? m.mentor_user_id ?? m.mentor_name) === key).length;
+  };
+
   const handleEventCreated = () => {
     // Refresh events list
     console.log('Event created successfully');
@@ -405,16 +411,31 @@ function AdminDashboard(){
                   <p>Mentorship requests will appear here once students start requesting.</p>
                 </div>
               ) : (
-                <div className="mentorships-grid">
-                  {mentorships.map(mentorship => (
-                    <div key={mentorship.id} className="mentorship-card">
-                      <div className="mentorship-info">
-                        <h4>{mentorship.mentor_name} → {mentorship.mentee_name}</h4>
-                        <p className="subject">{mentorship.subject_area}</p>
-                        <div className="status-badge">{mentorship.status}</div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="alumni-table-wrapper">
+                  <table className="alumni-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Mentor</th>
+                        <th>Mentees</th>
+                        <th>Subject</th>
+                        <th>Status</th>
+                        <th>Requested On</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mentorships.map((m, idx) => (
+                        <tr key={m.id}>
+                          <td>{idx + 1}</td>
+                          <td>{m.mentor_name || '-'}</td>
+                          <td>{getMenteesCountForMentor(m)}</td>
+                          <td>{m.subject_area || '-'}</td>
+                          <td><span className={`status-chip ${m.status}`}>{m.status}</span></td>
+                          <td>{m.created_at ? new Date(m.created_at).toLocaleDateString() : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

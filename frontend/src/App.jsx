@@ -12,7 +12,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import RecruiterDashboard from './pages/RecruiterDashboard';
 import PendingVerification from './pages/PendingVerification';
 import RejectedPage from './pages/RejectedPage';
-import StudentRegister from './pages/StudentRegister';
+import StudentRegisterPage from './pages/StudentRegisterPage';
 
 function App() {
   return (
@@ -27,7 +27,7 @@ function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/alumni-dashboard" element={<AlumniDashboard />} />
         <Route path="/student-dashboard" element={<StudentDashboard />} />
-        <Route path="/student-register" element={<StudentRegister />} />
+        <Route path="/student-register" element={<StudentRegisterPage />} />
         <Route path="/recruiter-dashboard" element={<RecruiterDashboard />} />
         <Route path="/pending" element={<PendingVerification />} />
         <Route path="/rejected" element={<RejectedPage />} />

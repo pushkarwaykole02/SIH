@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UpcomingEvents from '../components/UpcomingEvents';
 import MentorshipModule from '../components/MentorshipModule';
+import AnalyticsDashboard from '../components/AnalyticsDashboard';
 import DashboardNavbar from '../components/DashboardNavbar';
 import Footer from '../components/Landingpage/Footer';
 import '../css/StudentDashboard.css';
@@ -15,10 +16,14 @@ function StudentDashboard() {
   useEffect(() => {
     // Get student data from localStorage (set during login)
     const studentData = localStorage.getItem('student');
+    console.log('Student data from localStorage:', studentData); // Debug log
     if (studentData) {
       try {
-        setStudent(JSON.parse(studentData));
+        const parsedData = JSON.parse(studentData);
+        console.log('Parsed student data:', parsedData); // Debug log
+        setStudent(parsedData);
       } catch (err) {
+        console.error('Error parsing student data:', err); // Debug log
         setMsg('Error loading student data');
       }
     } else {
@@ -57,7 +62,7 @@ function StudentDashboard() {
             </div>
             <div className="profile-info">
               <h3>{student.name || 'Student'}</h3>
-              <p>Student • {student.department || 'Department'}</p>
+              <h5>{student.department || 'Department'}</h5>
               <span className="status-badge student">🎓 Student</span>
             </div>
           </div>
@@ -83,6 +88,12 @@ function StudentDashboard() {
               onClick={() => setActiveTab('mentorship')}
             >
               🤝 Mentorship
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+              onClick={() => setActiveTab('analytics')}
+            >
+              📊 View Analytics
             </button>
           </div>
 
@@ -113,27 +124,7 @@ function StudentDashboard() {
                 </div>
               </div>
 
-              <div className="quick-actions">
-                <h3>Quick Actions</h3>
-                <div className="actions-grid">
-                  <button className="action-btn" onClick={() => setActiveTab('events')}>
-                    <span className="action-icon">📅</span>
-                    <span>View Events</span>
-                  </button>
-                  <button className="action-btn" onClick={() => setActiveTab('mentorship')}>
-                    <span className="action-icon">🤝</span>
-                    <span>Find Mentor</span>
-                  </button>
-                  <button className="action-btn" onClick={() => window.open('https://discord.gg/KG96wAZK', '_blank')}>
-                    <span className="action-icon">💬</span>
-                    <span>Join Discussions</span>
-                  </button>
-                  <button className="action-btn">
-                    <span className="action-icon">📊</span>
-                    <span>View Analytics</span>
-                  </button>
-                </div>
-              </div>
+              {/* Quick Actions removed as requested; 'View Analytics' moved to top navigation */}
 
               {/* Recent Events Preview */}
               <div className="events-section">
@@ -156,6 +147,10 @@ function StudentDashboard() {
 
           {activeTab === 'mentorship' && (
             <MentorshipModule user={student} userRole="student" />
+          )}
+
+          {activeTab === 'analytics' && (
+            <AnalyticsDashboard />
           )}
         </div>
       </div>

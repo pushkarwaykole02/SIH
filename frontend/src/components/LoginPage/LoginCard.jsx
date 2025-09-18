@@ -56,6 +56,7 @@ function LoginCard(){
                 navigate('/alumni-dashboard', { replace: true });
             } else if (result.role === 'student') {
                 // Store student data and redirect to student dashboard
+                console.log('Student login result:', result); // Debug log
                 localStorage.setItem('student', JSON.stringify(result.user));
                 navigate('/student-dashboard', { replace: true });
             } else if (result.role === 'recruiter') {

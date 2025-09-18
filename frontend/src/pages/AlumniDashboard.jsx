@@ -194,6 +194,18 @@ function AlumniDashboard(){
             >
               🎯 Recommendations
             </button>
+            <button 
+              className="tab-btn"
+              onClick={handleUpdateProfile}
+            >
+              📝 Update Profile
+            </button>
+            <button 
+              className="tab-btn"
+              onClick={handleJoinDiscussions}
+            >
+              💬 Join Discussions
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -232,31 +244,7 @@ function AlumniDashboard(){
                 )}
               </div>
 
-              <div className="quick-actions">
-                <h3>Quick Actions</h3>
-                <div className="actions-grid">
-                  <button className="action-btn" onClick={handleUpdateProfile}>
-                    <span className="action-icon">📝</span>
-                    <span>Update Profile</span>
-                  </button>
-                  <button className="action-btn" onClick={() => setActiveTab('events')}>
-                    <span className="action-icon">📅</span>
-                    <span>View Events</span>
-                  </button>
-                  <button className="action-btn" onClick={() => setActiveTab('mentorship')}>
-                    <span className="action-icon">🤝</span>
-                    <span>Mentorship</span>
-                  </button>
-                  <button className="action-btn" onClick={() => setActiveTab('donations')}>
-                    <span className="action-icon">💝</span>
-                    <span>Donate</span>
-                  </button>
-                  <button className="action-btn" onClick={() => setActiveTab('career')}>
-                    <span className="action-icon">💼</span>
-                    <span>Career</span>
-                  </button>
-                </div>
-              </div>
+             {/* Quick Actions removed as requested; actions moved to top navigation */}
 
               {/* Recent Events Preview */}
               <div className="events-section">

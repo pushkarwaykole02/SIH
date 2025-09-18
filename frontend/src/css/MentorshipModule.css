@@ -27,7 +27,7 @@
 }
 
 .btn {
-  padding: 10px 20px;
+  max-width: 150px;
   border: none;
   border-radius: 8px;
   font-weight: 500;
@@ -37,6 +37,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  
 }
 
 .btn-primary {
@@ -111,11 +112,12 @@
   font-weight: 600;
 }
 
-.mentorship-subject {
-  margin: 0 0 8px 0;
+.mentorship-subject h5{
+  margin: 0 0 0 0;
   color: #3b82f6;
   font-weight: 500;
   font-size: 14px;
+  text-align: center !important;
 }
 
 .mentorship-description {
@@ -130,6 +132,27 @@
   align-items: center;
   font-size: 12px;
   color: #64748b;
+}
+
+.community-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  text-decoration: none;
+}
+
+.community-icon:hover {
+  background: #e2e8f0;
+}
+
+.community-icon img {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 .status-badge {
@@ -189,6 +212,50 @@
   overflow-y: auto;
 }
 
+/* Request Mentorship form only */
+.request-mentorship-modal {
+  max-width: 560px;
+  width: 90%;
+}
+
+.request-mentorship-modal .mentorship-form .form-group input,
+.request-mentorship-modal .mentorship-form .form-group textarea {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 15px;
+  width: 100% !important;
+  max-width: 100% !important;
+  display: block;
+  box-sizing: border-box;
+}
+
+/* ensure fields track the same inner width as the action buttons */
+.request-mentorship-modal .mentorship-form .form-group {
+  margin-right: 0;
+}
+
+.request-mentorship-modal .mentorship-form .form-group input:focus,
+.request-mentorship-modal .mentorship-form .form-group textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+.request-mentorship-modal .pick-btn {
+  margin-top: 10px;
+  background: #06b6d4;
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.request-mentorship-modal .pick-btn:hover {
+  background: #0891b2;
+}
+
 .modal-content::-webkit-scrollbar {
   display: none; /* WebKit browsers */
 }
@@ -233,6 +300,50 @@
   padding: 24px;
 }
 
+/* make request form fields align with action buttons */
+ .request-mentorship-modal .mentorship-form .edge-align input{
+   width: 120% !important;
+   max-width: none !important;
+   display: block;
+   box-sizing: border-box;
+ }
+ .request-mentorship-modal .mentorship-form .edge-align textarea{
+   width: 120% !important;
+   max-width: none !important;
+   display: block;
+   box-sizing: border-box;
+ }
+ .request-mentorship-modal .mentorship-form .edge-align .pick-btn {
+   width: 120% !important;
+   max-width: none !important;
+   display: block;
+   box-sizing: border-box;
+ }
+
+/* Mentor Picker modal: make search field align full width */
+.modal-content .mentorship-form .form-group input[type="text"] {
+  width: 120% !important;
+  max-width: none !important;
+  display: block;
+  box-sizing: border-box;
+}
+
+/* Mentor picker list spacing and button containment */
+.modal-content .mentors-list .mentorship-card {
+  margin-bottom: 16px;
+  padding-right: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-content .mentors-list .mentorship-card .btn {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .form-group {
   margin-bottom: 20px;
 }
@@ -263,28 +374,53 @@
 
 .checkbox-group {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  margin-top: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px 16px;
+  margin-top: 12px;
 }
 
 .checkbox-label {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px 1fr;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   cursor: pointer;
-  padding: 8px;
-  border-radius: 6px;
-  transition: background-color 0.2s ease;
+  padding: 12px 14px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  width: 110% !important;
 }
 
 .checkbox-label:hover {
-  background: #f8fafc;
+  background: #eef2ff;
+  border-color: #c7d2fe;
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: auto;
+  width: 18px;
+  height: 18px;
   margin: 0;
+}
+
+/* Register Mentor modal width */
+.register-mentor-modal {
+  max-width: 640px;
+}
+
+/* Wider mentor picker to fit content (responsive, no overflow) */
+.mentor-picker-modal {
+  width: 94% !important;   /* fit viewport */
+  max-width: 840px !important; /* allow wider content */
+}
+
+/* Align description textarea with widened option cards */
+.register-mentor-modal .mentorship-form textarea {
+  width: 118% !important;
+  max-width: none !important;
+  display: block;
+  box-sizing: border-box;
 }
 
 .form-actions {

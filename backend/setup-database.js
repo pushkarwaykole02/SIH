@@ -134,6 +134,23 @@ async function setupDatabase() {
     }
     console.log('✅ Alumni table columns updated');
 
+    // Students table
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='students' AND xtype='U')
+      CREATE TABLE students (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        user_id INT FOREIGN KEY REFERENCES Users(id),
+        name NVARCHAR(255) NOT NULL,
+        email NVARCHAR(255) UNIQUE NOT NULL,
+        phone NVARCHAR(50),
+        department NVARCHAR(255) NOT NULL,
+        linkedin NVARCHAR(500),
+        created_at DATETIME2 DEFAULT GETDATE(),
+        updated_at DATETIME2 DEFAULT GETDATE()
+      );
+    `);
+    console.log('✅ Students table created');
+
     // Events table
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='events' AND xtype='U')
