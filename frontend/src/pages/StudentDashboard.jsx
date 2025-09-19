@@ -87,7 +87,7 @@ function StudentDashboard() {
               className={`tab-btn ${activeTab === 'mentorship' ? 'active' : ''}`}
               onClick={() => setActiveTab('mentorship')}
             >
-              🤝 Mentorship
+              🤝 View Mentorship Programs
             </button>
             <button 
               className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}

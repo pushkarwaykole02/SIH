@@ -302,6 +302,34 @@ async function ensureTables() {
   );
   `;
 
+  // Mentorship Programs table (new workflow)
+  const createMentorshipPrograms = `
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='MentorshipPrograms' AND xtype='U')
+  CREATE TABLE MentorshipPrograms (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    mentor_user_id INT NOT NULL FOREIGN KEY REFERENCES Users(id),
+    subject NVARCHAR(255) NOT NULL,
+    description NVARCHAR(MAX) NULL,
+    whatsapp_link NVARCHAR(1000) NOT NULL,
+    batch_size INT NOT NULL CHECK (batch_size > 0),
+    is_active BIT NOT NULL DEFAULT 1,
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
+  );
+  `;
+
+  // Mentorship Enrollments table (new workflow)
+  const createMentorshipEnrollments = `
+  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='MentorshipEnrollments' AND xtype='U')
+  CREATE TABLE MentorshipEnrollments (
+    id INT IDENTITY(1,1) PRIMARY KEY,
+    program_id INT NOT NULL FOREIGN KEY REFERENCES MentorshipPrograms(id),
+    mentee_user_id INT NOT NULL FOREIGN KEY REFERENCES Users(id),
+    created_at DATETIME2 DEFAULT GETDATE(),
+    UNIQUE(program_id, mentee_user_id)
+  );
+  `;
+
   // Donations table
   const createDonations = `
   IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Donations' AND xtype='U')
@@ -371,6 +399,8 @@ async function ensureTables() {
     await pool.request().query(createEvents);
     await pool.request().query(createEventRSVP);
     await pool.request().query(createMentorship);
+    await pool.request().query(createMentorshipPrograms);
+    await pool.request().query(createMentorshipEnrollments);
     await pool.request().query(createDonations);
     await pool.request().query(createJobs);
     await pool.request().query(createNotifications);
@@ -1761,12 +1791,16 @@ app.post('/api/mentorship/request', async (req, res) => {
 
 // Get mentorship requests for a user
 app.get('/api/mentorship/:user_id', async (req, res) => {
-  const { user_id } = req.params;
   const { type } = req.query; // 'mentor' or 'mentee'
+  let { user_id } = req.params;
+  const parsedId = parseInt(user_id, 10);
+  if (Number.isNaN(parsedId)) {
+    return res.json({ success: true, mentorships: [] });
+  }
   
   try {
     const request = pool.request();
-    request.input('user_id', sql.Int, user_id);
+    request.input('user_id', sql.Int, parsedId);
     
     let query = '';
     if (type === 'mentor') {
@@ -1881,6 +1915,201 @@ app.get('/api/mentors', async (req, res) => {
   } catch (err) {
     console.error('Error listing mentors:', err);
     res.status(500).json({ error: 'Failed to fetch mentors' });
+  }
+});
+
+// ================= MENTORSHIP PROGRAMS (NEW WORKFLOW) ================= //
+
+// Mentor creates a mentorship program (whatsapp only, batch size)
+app.post('/api/mentorship/programs', async (req, res) => {
+  let { mentor_user_id, subject, description, whatsapp_link, batch_size } = req.body;
+  if (!mentor_user_id || !subject || !whatsapp_link || !batch_size) {
+    return res.status(400).json({ error: 'mentor_user_id, subject, whatsapp_link, batch_size are required' });
+  }
+  try {
+    // Normalize mentor_user_id: if it's an alumni.id, map to Users.id
+    let normalizedMentorId = parseInt(mentor_user_id, 10);
+    if (Number.isNaN(normalizedMentorId)) {
+      return res.status(400).json({ error: 'Invalid mentor_user_id' });
+    }
+    // Check Users table first
+    const userExists = await pool.request()
+      .input('uid', sql.Int, normalizedMentorId)
+      .query('SELECT TOP 1 id FROM Users WHERE id = @uid');
+    if (userExists.recordset.length === 0) {
+      // Try map from alumni.id -> alumni.user_id
+      const mapRes = await pool.request()
+        .input('aid', sql.Int, normalizedMentorId)
+        .query('SELECT TOP 1 user_id FROM alumni WHERE id = @aid');
+      if (mapRes.recordset.length > 0 && mapRes.recordset[0].user_id) {
+        normalizedMentorId = mapRes.recordset[0].user_id;
+      }
+    }
+
+    const request = pool.request();
+    request.input('mentor_user_id', sql.Int, normalizedMentorId);
+    request.input('subject', sql.NVarChar, subject);
+    request.input('description', sql.NVarChar, description || null);
+    request.input('whatsapp_link', sql.NVarChar, whatsapp_link);
+    request.input('batch_size', sql.Int, batch_size);
+
+    const result = await request.query(`
+      INSERT INTO MentorshipPrograms (mentor_user_id, subject, description, whatsapp_link, batch_size)
+      VALUES (@mentor_user_id, @subject, @description, @whatsapp_link, @batch_size);
+      SELECT SCOPE_IDENTITY() AS id;
+    `);
+    const id = result.recordset[0].id;
+    console.log('Created MentorshipProgram id=', id, 'mentor_user_id=', normalizedMentorId, 'subject=', subject);
+    const details = await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT p.*, a.name AS mentor_name, a.email AS mentor_email
+        FROM MentorshipPrograms p
+        LEFT JOIN alumni a ON a.user_id = p.mentor_user_id
+        WHERE p.id = @id
+      `);
+    const program = details.recordset[0];
+    console.log('Program details:', program);
+    res.json({ success: true, program });
+  } catch (err) {
+    console.error('Error creating mentorship program:', err);
+    res.status(500).json({ error: 'Failed to create mentorship program' });
+  }
+});
+
+// List active mentorship programs with current joined counts
+app.get('/api/mentorship/programs', async (req, res) => {
+  try {
+    const { mentee_user_id } = req.query;
+    const request = pool.request();
+    if (mentee_user_id) {
+      const parsed = parseInt(String(mentee_user_id), 10);
+      if (!Number.isNaN(parsed)) {
+        request.input('mentee_user_id', sql.Int, parsed);
+      }
+    }
+    const result = await request.query(`
+      SELECT p.id, p.mentor_user_id, p.subject, p.description, p.whatsapp_link, p.batch_size, p.is_active,
+             a.name AS mentor_name,
+             ISNULL(e.joined_count, 0) AS joined_count,
+             CASE WHEN @mentee_user_id IS NOT NULL AND EXISTS (
+               SELECT 1 FROM MentorshipEnrollments me WITH (NOLOCK)
+               WHERE me.program_id = p.id AND me.mentee_user_id = @mentee_user_id
+             ) THEN 1 ELSE 0 END AS joined_by_me
+      FROM MentorshipPrograms p
+      LEFT JOIN alumni a ON a.user_id = p.mentor_user_id
+      OUTER APPLY (
+        SELECT COUNT(*) AS joined_count FROM MentorshipEnrollments e WITH (NOLOCK)
+        WHERE e.program_id = p.id
+      ) e
+      ORDER BY p.created_at DESC
+    `);
+    console.log('List MentorshipPrograms count =', result.recordset.length);
+    res.json({ success: true, programs: result.recordset });
+  } catch (err) {
+    console.error('Error listing mentorship programs:', err);
+    res.status(500).json({ error: 'Failed to list mentorship programs' });
+  }
+});
+
+// Student joins a mentorship program (no approval, enforce capacity)
+app.post('/api/mentorship/programs/:program_id/join', async (req, res) => {
+  const { program_id } = req.params;
+  const { mentee_user_id } = req.body;
+  if (!mentee_user_id) {
+    return res.status(400).json({ error: 'mentee_user_id is required' });
+  }
+  try {
+    const request = pool.request();
+    request.input('program_id', sql.Int, program_id);
+    request.input('mentee_user_id', sql.Int, mentee_user_id);
+
+    // Get program and current count
+    const programRes = await request.query(`
+      SELECT p.*, ISNULL(cnt.cnt, 0) AS joined_count
+      FROM MentorshipPrograms p
+      OUTER APPLY (
+        SELECT COUNT(*) AS cnt FROM MentorshipEnrollments e WITH (UPDLOCK, HOLDLOCK)
+        WHERE e.program_id = p.id
+      ) cnt
+      WHERE p.id = @program_id AND p.is_active = 1
+    `);
+    if (programRes.recordset.length === 0) {
+      return res.status(404).json({ error: 'Program not found or inactive' });
+    }
+    const program = programRes.recordset[0];
+    if (program.joined_count >= program.batch_size) {
+      // Notify mentee about full program
+      try {
+        await pool.request()
+          .input('user_id', sql.Int, mentee_user_id)
+          .input('title', sql.NVarChar, 'Mentorship program is full')
+          .input('message', sql.NVarChar, `The program '${program.subject}' is already full.`)
+          .input('type', sql.NVarChar, 'mentorship')
+          .query(`INSERT INTO Notifications (user_id, title, message, type) VALUES (@user_id, @title, @message, @type);`);
+      } catch {}
+      return res.status(409).json({ error: 'Program is full' });
+    }
+
+    // Enroll (unique constraint prevents duplicates)
+    const enrollRes = await pool.request()
+      .input('program_id', sql.Int, program_id)
+      .input('mentee_user_id', sql.Int, mentee_user_id)
+      .query(`
+        INSERT INTO MentorshipEnrollments (program_id, mentee_user_id)
+        VALUES (@program_id, @mentee_user_id);
+        SELECT SCOPE_IDENTITY() AS id;
+      `);
+    // Create notification for mentee
+    try {
+      await pool.request()
+        .input('user_id', sql.Int, mentee_user_id)
+        .input('title', sql.NVarChar, 'Joined mentorship program')
+        .input('message', sql.NVarChar, `You joined '${program.subject}'.`)
+        .input('type', sql.NVarChar, 'mentorship')
+        .query(`INSERT INTO Notifications (user_id, title, message, type) VALUES (@user_id, @title, @message, @type);`);
+    } catch {}
+
+    res.json({ success: true, enrollment_id: enrollRes.recordset[0].id });
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE KEY')) {
+      // Already joined → notify
+      try {
+        const p = await pool.request().input('pid', sql.Int, program_id).query('SELECT subject FROM MentorshipPrograms WHERE id=@pid');
+        const subj = p.recordset?.[0]?.subject || 'mentorship program';
+        await pool.request()
+          .input('user_id', sql.Int, mentee_user_id)
+          .input('title', sql.NVarChar, 'Already joined')
+          .input('message', sql.NVarChar, `You have already joined '${subj}'.`)
+          .input('type', sql.NVarChar, 'mentorship')
+          .query(`INSERT INTO Notifications (user_id, title, message, type) VALUES (@user_id, @title, @message, @type);`);
+      } catch {}
+      return res.status(409).json({ error: 'Already joined this program' });
+    }
+    console.error('Error joining program:', err);
+    res.status(500).json({ error: 'Failed to join program' });
+  }
+});
+
+// Admin: list programs with joined/total
+app.get('/api/admin/mentorship-programs', async (req, res) => {
+  try {
+    const result = await pool.request().query(`
+      SELECT p.id, p.subject, p.batch_size, p.is_active, p.created_at,
+             a.name AS mentor_name, a.email AS mentor_email,
+             ISNULL(e.joined_count, 0) AS joined_count
+      FROM MentorshipPrograms p
+      LEFT JOIN alumni a ON a.user_id = p.mentor_user_id
+      OUTER APPLY (
+        SELECT COUNT(*) AS joined_count FROM MentorshipEnrollments e WITH (NOLOCK)
+        WHERE e.program_id = p.id
+      ) e
+      ORDER BY p.created_at DESC
+    `);
+    res.json({ success: true, programs: result.recordset });
+  } catch (err) {
+    console.error('Error listing admin mentorship programs:', err);
+    res.status(500).json({ error: 'Failed to list mentorship programs' });
   }
 });
 

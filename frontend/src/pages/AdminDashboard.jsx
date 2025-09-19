@@ -20,6 +20,7 @@ function AdminDashboard(){
   const [allAlumni, setAllAlumni] = useState([]);
   const [donations, setDonations] = useState([]);
   const [mentorships, setMentorships] = useState([]);
+  const [programs, setPrograms] = useState([]);
   const [alumniView, setAlumniView] = useState('pending'); // 'pending' | 'all'
   const [actionLoading, setActionLoading] = useState({ id: null, type: null }); // {id, type: 'approve'|'decline'}
   
@@ -70,6 +71,15 @@ function AdminDashboard(){
     }
   };
 
+  const loadMentorshipPrograms = async () => {
+    try {
+      const data = await apiService.getAdminMentorshipPrograms();
+      setPrograms(data.programs || []);
+    } catch (err) {
+      console.error('Error loading mentorship programs:', err);
+    }
+  };
+
   const getMenteesCountForMentor = (row) => {
     const key = row.mentor_id ?? row.mentor_user_id ?? row.mentor_name;
     if (!key) return 0;
@@ -95,6 +105,12 @@ function AdminDashboard(){
       loadDonations();
     } else if (activeTab === 'mentorships') {
       loadMentorships();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'mentorships') {
+      loadMentorshipPrograms();
     }
   }, [activeTab]);
   
@@ -404,11 +420,11 @@ function AdminDashboard(){
             </div>
             
             <div className="mentorships-list">
-              {mentorships.length === 0 ? (
+              {programs.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon">🤝</div>
-                  <h3>No Mentorship Requests</h3>
-                  <p>Mentorship requests will appear here once students start requesting.</p>
+                  <h3>No Mentorship Programs</h3>
+                  <p>Programs created by mentors will appear here.</p>
                 </div>
               ) : (
                 <div className="alumni-table-wrapper">
@@ -417,21 +433,21 @@ function AdminDashboard(){
                       <tr>
                         <th>#</th>
                         <th>Mentor</th>
-                        <th>Mentees</th>
-                        <th>Subject</th>
-                        <th>Status</th>
-                        <th>Requested On</th>
+                        <th>Program</th>
+                        <th>Joined / Batch</th>
+                        <th>Active</th>
+                        <th>Created</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {mentorships.map((m, idx) => (
-                        <tr key={m.id}>
+                      {programs.map((p, idx) => (
+                        <tr key={p.id}>
                           <td>{idx + 1}</td>
-                          <td>{m.mentor_name || '-'}</td>
-                          <td>{getMenteesCountForMentor(m)}</td>
-                          <td>{m.subject_area || '-'}</td>
-                          <td><span className={`status-chip ${m.status}`}>{m.status}</span></td>
-                          <td>{m.created_at ? new Date(m.created_at).toLocaleDateString() : '-'}</td>
+                          <td>{p.mentor_name || '-'}</td>
+                          <td>{p.subject}</td>
+                          <td>{p.joined_count}/{p.batch_size}</td>
+                          <td>{p.is_active ? 'Yes' : 'No'}</td>
+                          <td>{p.created_at ? new Date(p.created_at).toLocaleDateString() : '-'}</td>
                         </tr>
                       ))}
                     </tbody>

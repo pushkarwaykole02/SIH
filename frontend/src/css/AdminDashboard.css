@@ -406,7 +406,7 @@
         background: linear-gradient(135deg, #fb8500, #f97316);
         color: white;
         border: none;
-        padding: 18px 10px;   /* smaller padding */
+        padding: 10px 10px;   /* smaller padding */
         border-radius: 40px;  /* slightly smaller radius */
         font-weight: 600;
         font-size: 13px;     /* smaller font size */

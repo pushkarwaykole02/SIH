@@ -374,7 +374,7 @@ export const apiService = {
 
   // ================= MENTORSHIP API FUNCTIONS ================= //
 
-  // Register as mentor
+  // Register as mentor (legacy)
   async registerAsMentor(mentorData) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/mentorship/register`, {
@@ -397,7 +397,7 @@ export const apiService = {
     }
   },
 
-  // Create mentorship request
+  // Create mentorship request (legacy)
   async createMentorshipRequest(requestData) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/mentorship/request`, {
@@ -474,6 +474,79 @@ export const apiService = {
       return await response.json();
     } catch (error) {
       console.error('List mentors error:', error);
+      throw error;
+    }
+  },
+
+  // -------- New Mentorship Programs workflow -------- //
+
+  // Mentor creates a mentorship program
+  async createMentorshipProgram(programData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/mentorship/programs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(programData),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create program');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Create mentorship program error:', error);
+      throw error;
+    }
+  },
+
+  // List active mentorship programs
+  async listMentorshipPrograms(menteeUserId) {
+    try {
+      const url = menteeUserId
+        ? `${API_BASE_URL}/api/mentorship/programs?mentee_user_id=${encodeURIComponent(menteeUserId)}`
+        : `${API_BASE_URL}/api/mentorship/programs`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch programs');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('List mentorship programs error:', error);
+      throw error;
+    }
+  },
+
+  // Join a mentorship program
+  async joinMentorshipProgram(programId, menteeUserId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/mentorship/programs/${programId}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mentee_user_id: menteeUserId }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to join program');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Join mentorship program error:', error);
+      throw error;
+    }
+  },
+
+  // Admin: list mentorship programs with counts
+  async getAdminMentorshipPrograms() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/mentorship-programs`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch mentorship programs');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Admin list mentorship programs error:', error);
       throw error;
     }
   },

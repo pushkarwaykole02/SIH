@@ -197,6 +197,36 @@ async function setupDatabase() {
     `);
     console.log('✅ Mentorship table created');
 
+    // Mentorship Programs table
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='MentorshipPrograms' AND xtype='U')
+      CREATE TABLE MentorshipPrograms (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        mentor_user_id INT NOT NULL FOREIGN KEY REFERENCES Users(id),
+        subject NVARCHAR(255) NOT NULL,
+        description NVARCHAR(MAX) NULL,
+        whatsapp_link NVARCHAR(1000) NOT NULL,
+        batch_size INT NOT NULL CHECK (batch_size > 0),
+        is_active BIT NOT NULL DEFAULT 1,
+        created_at DATETIME2 DEFAULT GETDATE(),
+        updated_at DATETIME2 DEFAULT GETDATE()
+      );
+    `);
+    console.log('✅ MentorshipPrograms table created');
+
+    // Mentorship Enrollments table
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='MentorshipEnrollments' AND xtype='U')
+      CREATE TABLE MentorshipEnrollments (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        program_id INT NOT NULL FOREIGN KEY REFERENCES MentorshipPrograms(id),
+        mentee_user_id INT NOT NULL FOREIGN KEY REFERENCES Users(id),
+        created_at DATETIME2 DEFAULT GETDATE(),
+        UNIQUE(program_id, mentee_user_id)
+      );
+    `);
+    console.log('✅ MentorshipEnrollments table created');
+
     // Donations table
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Donations' AND xtype='U')
