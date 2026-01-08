@@ -1,0 +1,22 @@
+.key-feature-heading {
+    padding: 10px;
+    margin:  0px 10px 0px 10px;
+}
+.tagline{
+    padding: 0px 10px 0px 10px ;
+    margin: 0px 10px 0px 10px; 
+}
+
+.feature-card{
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px; 
+    margin: 24px;
+    justify-content: center;
+}
+@media (max-width: 960px){
+    .feature-card{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px){
+    .feature-card{ grid-template-columns: 1fr; }
+}
